@@ -7,6 +7,10 @@
 --/$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 print("[RedTiger] Loader demarre - verification de la clé...")
+print("[RedTiger] Executor : " .. (function()
+	local ok, name = pcall(function() return getExecutorName and getExecutorName() or "inconnu" end)
+	return ok and tostring(name) or "inconnu"
+end)())
 
 local Players     = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
@@ -253,12 +257,31 @@ local success, gui = pcall(function()
 	screenGui.Name         = "RedTigerKeySystem"
 	screenGui.ResetOnSpawn = false
 	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	-- Parent le plus robuste possible : gethui / CoreGui / PlayerGui
+	local parented = false
+	pcall(function()
+		if type(gethui) == "function" and gethui() ~= nil then
+			screenGui.Parent = gethui()
+			parented = true
+		end
+	end)
+	if not parented then
+		pcall(function()
+			screenGui.Parent = game:GetService("CoreGui")
+			parented = true
+		end)
+	end
+	if not parented then
+		screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+	end
+	screenGui.DisplayOrder = 2147483
+
+	-- protection syn (avant parenting)
 	pcall(function()
 		if type(syn) == "table" and type(syn.protect_gui) == "function" then
 			syn.protect_gui(screenGui)
 		end
 	end)
-	screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 	local frame            = Instance.new("Frame")
 	frame.Name             = "KeyFrame"
@@ -357,8 +380,32 @@ local success, gui = pcall(function()
 	return screenGui
 end)
 
+print("[RedTiger] Etape 2 : fenetre de clé creee")
+
 if not success or gui == nil then
-	warn("[RedTiger] Impossible d'afficher la fenetre de clé : " .. tostring(gui))
+	print("[RedTiger] ERREUR popup normale : " .. tostring(gui) .. " -> popup de secours")
+	-- popup de secours ultra-simple (toujours jouable)
+	pcall(function()
+		local sg = Instance.new("ScreenGui")
+		sg.Name = "RedTigerKeySystem"
+		sg.ResetOnSpawn = false
+		sg.Parent = (LocalPlayer and LocalPlayer:FindFirstChildOfClass("PlayerGui")) or game:GetService("CoreGui")
+		local fr = Instance.new("Frame")
+		fr.Size = UDim2.new(0, 380, 0, 200)
+		fr.Position = UDim2.new(0.5, 0, 0.5, 0)
+		fr.AnchorPoint = Vector2.new(0.5, 0.5)
+		fr.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+		fr.Parent = sg
+		local lb = Instance.new("TextLabel")
+		lb.Size = UDim2.new(1, -20, 1, -20)
+		lb.Position = UDim2.new(0, 10, 0, 10)
+		lb.BackgroundTransparency = 1
+		lb.TextColor3 = Color3.new(1, 1, 1)
+		lb.TextScaled = true
+		lb.TextWrapped = true
+		lb.Text = "RedTiger\n\nLa fenetre de clé n'arrive pas a s'afficher.\nErreur : " .. tostring(gui)
+		lb.Parent = fr
+	end)
 	return
 end
 
