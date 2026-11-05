@@ -19,7 +19,7 @@ local LocalPlayer = Players.LocalPlayer
 local REPO_RAW  = "https://raw.githubusercontent.com/chefnon29/REDTIGER-Lua/refs/heads/main"
 local KEYS_API  = "https://api.github.com/repos/chefnon29/REDTIGER-Lua/contents/keys.json"
 local KEYS_RAW  = REPO_RAW .. "/keys.json"
-local PANEL_URL = REPO_RAW .. "/Panel.lua"
+local PANEL_ENC_URL = REPO_RAW .. "/Panel.enc.lua"
 local KEY_FILE  = "RedTiger/key.txt"
 local LOGS_FILE = "RedTiger/logs.txt"
 
@@ -172,6 +172,141 @@ local function b64decode(data)
 		end
 		return string.char(c)
 	end))
+end
+
+-- ================================================================
+--  RT-CRYPTO v1 (identique a crypto.js du bot : hash haché irreverssible
+--  des cles + chiffrement de flot du panel ; teste croise Lua/JS)
+-- ================================================================
+local RT_KEY_SALT = "65DF14AEB7D7660D078D639EAF40E144"
+
+local function rtImul32(a, b)
+	local al = a % 65536
+	local ah = (a - al) / 65536
+	local bl = b % 65536
+	local bh = (b - bl) / 65536
+	local lo = al * bl
+	local mid = (al * bh + ah * bl) % 65536
+	return (lo + mid * 65536) % 4294967296
+end
+
+local function rtBytes(s)
+	local t = {}
+	for i = 1, #s do t[i] = string.byte(s, i) end
+	return t
+end
+
+local function rtHash32(msg, saltStr)
+	local h = 0x811C9DC5
+	local function mix(b)
+		h = bit32.bxor(h, b)
+		h = rtImul32(h, 0x01000193)
+		h = bit32.bxor(h, bit32.lrotate(h, 7))
+	end
+	for _, b in ipairs(rtBytes(saltStr)) do mix(b) end
+	for _, b in ipairs(rtBytes(msg)) do mix(b) end
+	h = bit32.bxor(h, bit32.rshift(h, 16))
+	h = rtImul32(h, 0x85EBCA6B)
+	h = bit32.bxor(h, bit32.rshift(h, 13))
+	h = rtImul32(h, 0xC2B2AE35)
+	h = bit32.bxor(h, bit32.rshift(h, 16))
+	return h
+end
+
+local function rtHex8(h)
+	return string.upper(string.format("%08x", h))
+end
+
+local function rtHash64(msg, salt)
+	return rtHex8(rtHash32(msg, salt)) .. rtHex8(rtHash32(msg, salt .. "#2"))
+end
+
+local function rtKeyHash(key)
+	return rtHash64(key, RT_KEY_SALT .. "/key/")
+end
+
+local function rtMakeCipher(secret)
+	local x = rtHash32(secret, "rt/cipher/1")
+	local y = rtHash32(secret, "rt/cipher/2")
+	local z = rtHash32(secret, "rt/cipher/3")
+	local d = rtHash32(secret, "rt/cipher/4")
+	return function()
+		local t = bit32.bxor(x, bit32.lshift(x, 11))
+		x = y
+		y = z
+		z = d
+		d = bit32.bxor(bit32.bxor(d, bit32.rshift(d, 19)), bit32.bxor(t, bit32.rshift(t, 8)))
+		return bit32.band(d, 255)
+	end
+end
+
+-- decode un base64 REVEnvoyable en table d'octets (rapide, panel complet)
+local B64VAL_RT = {}
+do
+	for i = 1, #B64CHARS do
+		B64VAL_RT[string.byte(B64CHARS, i)] = i - 1
+	end
+end
+
+local function b64ToBytes(b64)
+	local out = {}
+	local n = 0
+	local buf = 0
+	local bits = 0
+	for i = 1, #b64 do
+		local v = B64VAL_RT[string.byte(b64, i)]
+		if v then
+			buf = buf * 64 + v
+			bits = bits + 6
+			if bits >= 8 then
+				local shift = bits - 8
+				n = n + 1
+				out[n] = math.floor(buf / 2 ^ shift) % 256
+				bits = shift
+				buf = buf % 2 ^ bits
+			end
+		end
+	end
+	return out
+end
+
+-- ================================================================
+--  Dechiffrement du panel stocke chiffre sur GitHub :
+--  1) entry.pkey = cle du panel chiffree AVEC la cle de l'utilisateur
+--  2) Panel.enc.lua chiffre AVEC cette cle du panel
+--  Pas de clé valide -> impossible de rien reconstruire.
+-- ================================================================
+local function rtDecryptPKey(pkeyB64, userKey)
+	local raw = b64decode(tostring(pkeyB64 or ""))
+	if type(raw) ~= "string" or #raw == 0 then return nil end
+	local nextByte = rtMakeCipher(userKey)
+	local out = {}
+	for i = 1, #raw do
+		out[i] = string.char(bit32.band(bit32.bxor(string.byte(raw, i), nextByte()), 255))
+	end
+	local k = table.concat(out)
+	if #k == 16 then return k end
+	return nil
+end
+
+local function rtDecryptBlob(b64, secret)
+	local bytes = b64ToBytes(tostring(b64 or ""))
+	local nextByte = rtMakeCipher(secret)
+	local chunks = {}
+	local n = #bytes
+	local start = 1
+	while start <= n do
+		local limit = math.min(start + 4000, n)
+		local chunk = {}
+		local ci = 0
+		for i = start, limit do
+			ci = ci + 1
+			chunk[ci] = string.char(bit32.band(bit32.bxor(bytes[i], nextByte()), 255))
+		end
+		chunks[#chunks + 1] = table.concat(chunk)
+		start = limit + 1
+	end
+	return table.concat(chunks)
 end
 
 -- ================================================================
@@ -483,7 +618,7 @@ local function checkKey(key)
 		end
 	end
 
-	local entry = data[key]
+	local entry = data[rtKeyHash(key)]
 	if type(entry) ~= "table" then
 		return false, 0, "invalide", "Clé invalide. Demande une clé a ton admin Discord."
 	end
@@ -493,21 +628,44 @@ local function checkKey(key)
 		return false, expires, "expire", "Clé expiree. Demande-en une nouvelle ou un extension a ton admin."
 	end
 
-	return true, expires, nil
+	return true, expires, nil, entry
 end
 
 -- ================================================================
---  Chargement du panel (SEULEMENT si clé valide)
+--  Chargement du panel chiffré (SEULEMENT si clé valide)
 -- ================================================================
-local function launchPanel()
-	local code, err = httpGet(PANEL_URL)
+local function loadPanelCode(userKey, entry)
+	local pkeyB64 = tostring(type(entry) == "table" and entry.pkey or "")
+	if #pkeyB64 == 0 then
+		return nil, "Cette cle n'a pas d'acces au panel. Demande une nouvelle cle a ton admin."
+	end
+	local secret = rtDecryptPKey(pkeyB64, userKey)
+	if secret == nil then
+		return nil, "Acces au panel incorrect pour cette cle."
+	end
+	local blob, blobErr = httpGet(PANEL_ENC_URL)
+	if blob == nil then
+		return nil, "Telechargement du panel impossible (" .. tostring(blobErr) .. ")"
+	end
+	local code = rtDecryptBlob(blob, secret)
+	if type(code) ~= "string" or #code < 64 then
+		return nil, "Panel verrouille pour cette cle."
+	end
+	return code
+end
+
+local function launchPanel(userKey, entry)
+	print("[RedTiger] Etape 3 : dechiffrement + chargement du panel...")
+	local code, err = loadPanelCode(userKey, entry)
 	if code == nil then
-		warn("[RedTiger] Erreur de telechargement du panel : " .. tostring(err))
+		guiStatus("❌ " .. tostring(err))
+		print("[RedTiger] Chargement du panel impossible : " .. tostring(err))
 		return
 	end
 	local fn, compileErr = loadstring(code)
 	if fn == nil then
 		warn("[RedTiger] Erreur de compilation du panel : " .. tostring(compileErr))
+		guiStatus("❌ Erreur interne du panel.")
 		return
 	end
 	local ok, runErr = pcall(fn)
@@ -529,7 +687,7 @@ local function validate()
 	guiStatus("Verification de la clé...")
 	verifyButton.Text = "Verification..."
 
-	local ok, expiresUnix, tag, message = checkKey(key)
+	local ok, expiresUnix, tag, message, entry = checkKey(key)
 	if not ok then
 		guiStatus("❌ " .. tostring(message))
 		verifyButton.Text = "Valider"
@@ -601,7 +759,7 @@ local function validate()
 		end
 	end)
 
-	launchPanel()
+	launchPanel(key, entry)
 end
 
 verifyButton.MouseButton1Click:Connect(validate)

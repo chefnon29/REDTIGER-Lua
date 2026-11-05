@@ -28,6 +28,7 @@ const {
 } = require("discord.js");
 const fs = require("fs");
 const path = require("path");
+const RT = require("./crypto.js");
 
 // =================== CONFIG ===================
 const CONFIG = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8"));
@@ -36,6 +37,8 @@ const DISCORD_TOKEN = CONFIG.discordToken;
 const GITHUB_TOKEN  = CONFIG.githubToken;
 const REPO          = CONFIG.githubRepo;              // "chefnon29/REDTIGER-Lua"
 const KEYS_FILE     = CONFIG.keysFile || "keys.json";
+const KEY_SALT      = CONFIG.keySalt;                 // OBLIGATOIRE (hash des cles)
+const PANEL_KEY     = CONFIG.panelKey;                // cle de dechiffrement du panel chiffre
 const ADMINS        = CONFIG.admins || [];            // IDs Discord autorises en DM
 const ALLOWED_GUILDS = CONFIG.allowedServers || [];   // serveurs autorisees (vide = tous)
 
@@ -55,6 +58,51 @@ const DURATIONS = {
 
 // =================== BASE DE CLES ===================
 let keys = {};
+
+// ---------- helpers cryptés ----------
+function pkeyFor(userKey) {
+    // la cle du panel (PANEL_KEY) chiffree AVEC la cle de l'utilisateur :
+    // le loader peut la decouvrir, personne d'autre.
+    return Buffer.from(RT.xorBytes(RT.strBytes(PANEL_KEY), RT.makeCipher(userKey))).toString("base64");
+}
+
+function maskOf(key) {
+    const up = key.toUpperCase().trim();
+    if (up.length < 14) return "REDTIGER-****";
+    return up.slice(0, 9) + "****-****-" + up.slice(-4);
+}
+
+function normalizeKeyInput(raw) {
+    return String(raw || "").toUpperCase().trim().replace(/\s/g, "");
+}
+
+// Migration : les vieilles entrees sont en clair ("REDTIGER-...").
+// On les transforme en entrees hachées (irreversibles) une fois pour toutes.
+function forceNormalizeKeys() {
+    let changed = false;
+    const pending = [];
+    for (const [name, entry] of Object.entries(keys)) {
+        if (/^REDTIGER-/i.test(name)) {
+            const up = normalizeKeyInput(name);
+            entry.mask = entry.mask || maskOf(up);
+            if (!entry.pkey && PANEL_KEY) entry.pkey = pkeyFor(up);
+            keys[RT.keyHash(up, KEY_SALT)] = entry;
+            delete keys[name];
+            changed = true;
+        } else if (typeof entry === "object" && entry !== null && !entry.mask && !name.startsWith("_")) {
+            pending.push(name);
+        }
+    }
+    for (const h of pending) {
+        // entree hachée sans masque : on garde le hash comme masque tronque
+        keys[h].mask = "REDTIGER-****-" + h.slice(-4);
+    }
+    if (!Array.isArray(keys["_retired"])) {
+        keys["_retired"] = [];
+        changed = true;
+    }
+    return changed;
+}
 
 function loadLocal() {
     try {
@@ -125,10 +173,13 @@ function randomChunk(n) {
 }
 
 function generateKey() {
-    let key;
+    // Jamais deux fois la même clé : vérifie la base courante
+    // ET l'historique _retired (une clé supprimée ne revient jamais).
+    let key, h;
     do {
         key = `REDTIGER-${randomChunk(4)}-${randomChunk(4)}-${randomChunk(4)}`;
-    } while (keys[key]);
+        h = RT.keyHash(key, KEY_SALT);
+    } while (keys[h] || (keys["_retired"] && keys["_retired"].includes(h)));
     return key;
 }
 
@@ -258,9 +309,25 @@ client.on(Events.ClientReady, async (c) => {
     const remote = await fetchRemote();
     if (remote && typeof remote === "object") {
         keys = remote;
-        console.log(`Base distante chargee : ${Object.keys(keys).length} cle(s)`);
+        console.log(`Base distante chargee : ${Object.keys(keys).filter((k) => !k.startsWith("_")).length} cle(s)`);
     } else if (remote === null) {
         console.error("Base distante illisible : le bot utilise sa sauvegarde locale jusqu'a reussite.");
+    }
+
+    // chiffre les vieilles cles en clair + prepare l'historique
+    if (!KEY_SALT) {
+        console.error("ERREUR : keySalt absent de config.json — impossible de continuer.");
+        process.exit(1);
+    }
+    if (forceNormalizeKeys()) {
+        console.log("Migration : cles chiffrees dans la base (plus rien en clair sur GitHub).");
+        const okM = await saveKeys();
+        console.log(okM ? "Migration synchronisee sur GitHub." : "ERREUR de synchro de la migration (les cles clair resteraient visibles !) — relance le bot.");
+    } else {
+        console.log("Base deja chiffree, rien a migrer.");
+    }
+    if (!PANEL_KEY) {
+        console.error("ATTENTION : panelKey absent de config.json — les cles seroitas creees sans acces au panel !");
     }
 
     for (const g of c.guilds.cache.values()) {
@@ -295,7 +362,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const created = [];
             for (let i = 0; i < quantity; i++) {
                 const key = generateKey();
-                keys[key] = { duration: durationKey, created: now, expires, hwid: null };
+                const h = RT.keyHash(key, KEY_SALT);
+                keys[h] = { mask: maskOf(key), duration: durationKey, created: now, expires, hwid: null };
+                if (PANEL_KEY) keys[h].pkey = pkeyFor(key);
                 created.push(key);
             }
             const okS = await saveKeys();
@@ -319,10 +388,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 return;
             }
             const now = Math.floor(Date.now() / 1000);
-            const lines = entries.map(([key, e]) => {
+            const lines = entries.map(([h, e]) => {
                 const expired = e.expires > 0 && now >= e.expires;
                 const remaining = e.expires > 0 ? `${Math.max(0, e.expires - now)}s restantes` : "a vie";
-                return `\`${key}\` — ${DURATIONS[e.duration]?.label ?? e.duration}${expired ? " (expire)" : ` (${remaining})`}`;
+                return `\`${e.mask || ("REDTIGER-****-" + h.slice(-4))}\` — ${DURATIONS[e.duration]?.label ?? e.duration}${expired ? " (expire)" : ` (${remaining})`}`;
             });
             for (let i = 0; i < lines.length; i += 25) {
                 const chunk = lines.slice(i, i + 25).join("\n");
@@ -334,30 +403,34 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         if (cmd === "delkey") {
             await interaction.deferReply({ ephemeral: true });
-            const key = interaction.options.getString("cle", true).toUpperCase().trim().replace(/\s/g, "");
-            if (!keys[key]) {
-                await safeEdit(interaction, `Cle \`${key}\` introuvable.`);
+            const key = normalizeKeyInput(interaction.options.getString("cle", true));
+            const h = RT.keyHash(key, KEY_SALT);
+            if (!keys[h]) {
+                await safeEdit(interaction, `Cle \`${maskOf(key)}\` introuvable.`);
                 return;
             }
-            delete keys[key];
+            delete keys[h];
+            // historique : cette clé ne sera JAMAIS regeneree
+            const retired = keys["_retired"];
+            if (Array.isArray(retired) && !retired.includes(h)) retired.push(h);
             const okS = await saveKeys();
-            await safeEdit(interaction, `Cle \`${key}\` supprimee. ${okS ? "Synchronise avec GitHub." : "Sauvegarde locale seulement."}\nBase : **${Object.keys(keys).filter((k) => !k.startsWith("_")).length}** cle(s)`);
-            await postLog("🗑️ Cle supprimee", `\`${key}\` supprimee par ${interaction.user}\nSi quelqu'un l'a encore en session, il sera ejecte a la prochaine verification.`, 15158332);
+            await safeEdit(interaction, `Cle \`${maskOf(key)}\` supprimee. ${okS ? "Synchronise avec GitHub." : "Sauvegarde locale seulement."}\n(ajoutee a l'historique : jamais regeneree)\nBase : **${Object.keys(keys).filter((k) => !k.startsWith("_")).length}** cle(s)`);
+            await postLog("🗑️ Cle supprimee", `\`${maskOf(key)}\` supprimee par ${interaction.user}\nSi quelqu'un l'a encore en session, il sera ejecte a la prochaine verification.`, 15158332);
             return;
         }
 
         if (cmd === "check") {
             await interaction.deferReply({ ephemeral: true });
-            const key = interaction.options.getString("cle", true).toUpperCase().trim().replace(/\s/g, "");
-            const entry = keys[key];
+            const key = normalizeKeyInput(interaction.options.getString("cle", true));
+            const entry = keys[RT.keyHash(key, KEY_SALT)];
             if (!entry) {
-                await safeEdit(interaction, `\`${key}\` : cle **invalide** (n'existe pas dans la base).`);
+                await safeEdit(interaction, `\`${maskOf(key)}\` : cle **invalide** (n'existe pas dans la base).`);
                 return;
             }
             const now = Math.floor(Date.now() / 1000);
             const expired = entry.expires > 0 && now >= entry.expires;
             await safeEdit(interaction,
-                `**${key}**\n` +
+                `**${entry.mask || maskOf(key)}**\n` +
                 `- Duree : **${DURATIONS[entry.duration]?.label ?? entry.duration}**\n` +
                 `- Cree le : ${frDate(entry.created)}\n` +
                 `- Expire le : ${frDate(entry.expires)}\n` +
@@ -369,34 +442,36 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         if (cmd === "extend") {
             await interaction.deferReply({ ephemeral: true });
-            const key = interaction.options.getString("cle", true).toUpperCase().trim().replace(/\s/g, "");
+            const key = normalizeKeyInput(interaction.options.getString("cle", true));
             const dur = DURATIONS[interaction.options.getString("duree", true)];
-            if (!keys[key]) {
-                await safeEdit(interaction, `Cle \`${key}\` introuvable.`);
+            const entry = keys[RT.keyHash(key, KEY_SALT)];
+            if (!entry) {
+                await safeEdit(interaction, `Cle \`${maskOf(key)}\` introuvable.`);
                 return;
             }
-            const durInfo = DURATIONS[keys[key].duration] ?? { seconds: 0, label: "?" };
+            const durInfo = DURATIONS[entry.duration] ?? { seconds: 0, label: "?" };
             if (durInfo.seconds === 0) {
-                await safeEdit(interaction, `Cle \`${key}\` est deja **a vie**, rien a rallonger !`);
+                await safeEdit(interaction, `Cle \`${entry.mask || maskOf(key)}\` est deja **a vie**, rien a rallonger !`);
                 return;
             }
-            keys[key].expires = Math.max(keys[key].expires ?? 0, Math.floor(Date.now() / 1000)) + dur.seconds;
-            keys[key].duration = interaction.options.getString("duree", true);
+            entry.expires = Math.max(entry.expires ?? 0, Math.floor(Date.now() / 1000)) + dur.seconds;
+            entry.duration = interaction.options.getString("duree", true);
             const okS = await saveKeys();
-            await safeEdit(interaction, `Cle \`${key}\` : nouvelle duree **${dur.label}** (expire ${frDate(keys[key].expires)}) ${okS ? "Synchronise avec GitHub." : ""}`);
+            await safeEdit(interaction, `Cle \`${entry.mask || maskOf(key)}\` : nouvelle duree **${dur.label}** (expire ${frDate(entry.expires)}) ${okS ? "Synchronise avec GitHub." : ""}`);
             return;
         }
 
         if (cmd === "reset-hwid") {
             await interaction.deferReply({ ephemeral: true });
-            const key = interaction.options.getString("cle", true).toUpperCase().trim().replace(/\s/g, "");
-            if (!keys[key]) {
-                await safeEdit(interaction, `Cle \`${key}\` introuvable.`);
+            const key = normalizeKeyInput(interaction.options.getString("cle", true));
+            const entry = keys[RT.keyHash(key, KEY_SALT)];
+            if (!entry) {
+                await safeEdit(interaction, `Cle \`${maskOf(key)}\` introuvable.`);
                 return;
             }
-            keys[key].hwid = null;
+            entry.hwid = null;
             const okS = await saveKeys();
-            await safeEdit(interaction, `Cle \`${key}\` : HWID delie. Ok ${okS ? "synchronise" : "local seul"}.`);
+            await safeEdit(interaction, `Cle \`${entry.mask || maskOf(key)}\` : HWID delie. Ok ${okS ? "synchronise" : "local seul"}.`);
             return;
         }
 
