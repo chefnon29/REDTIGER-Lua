@@ -1,1 +1,8 @@
-{}
+{
+  "REDTIGER-TEST-1234-5678": {
+    "duration": "1jour",
+    "created": 1793841779,
+    "expires": 1793928179,
+    "hwid": null
+  }
+}
