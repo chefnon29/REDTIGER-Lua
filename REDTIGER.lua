@@ -10,7 +10,8 @@ local Players     = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 
 local REPO_RAW  = "https://raw.githubusercontent.com/chefnon29/REDTIGER-Lua/refs/heads/main"
-local KEYS_URL  = REPO_RAW .. "/keys.json"
+local KEYS_API  = "https://api.github.com/repos/chefnon29/REDTIGER-Lua/contents/keys.json"
+local KEYS_RAW  = REPO_RAW .. "/keys.json"
 local PANEL_URL = REPO_RAW .. "/Panel.lua"
 local KEY_FILE  = "RedTiger/key.txt"
 
@@ -266,17 +267,65 @@ local function launchPanel()
 end
 
 -- ================================================================
+--  Decodage base64 (pour reponse API GitHub)
+-- ================================================================
+local B64CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+local function b64decode(data)
+	data = data:gsub("[^" .. B64CHARS .. "=]", "")
+	data = (data:gsub(".", function(x)
+		if x == "=" then return "" end
+		local r, f = "", (B64CHARS:find(x) - 1)
+		for i = 6, 1, -1 do
+			r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and "1" or "0")
+		end
+		return r
+	end))
+	return (data:gsub("%d%d?%d?%d?%d?%d?%d?%d?", function(x)
+		if #x ~= 8 then return "" end
+		local c = 0
+		for i = 1, 8 do
+			c = c + (x:sub(i, i) == "1" and 2 ^ (8 - i) or 0)
+		end
+		return string.char(c)
+	end))
+end
+
+-- ================================================================
+--  Recuperation de la base de clés :
+--  1) API GitHub (toujours a jour, pas de cache CDN)
+--  2) sinon raw.githubusercontent (peut avoir ~5 min de retard)
+-- ================================================================
+local function fetchKeysTable()
+	local ok, envelope = pcall(function() return HttpService:JSONDecode(httpGet(KEYS_API)) end)
+	if ok and type(envelope) == "table" and type(envelope.content) == "string" then
+		local decoded = b64decode(envelope.content)
+		if decoded and #decoded > 0 then
+			local jsonOk, data = pcall(function() return HttpService:JSONDecode(decoded) end)
+			if jsonOk and type(data) == "table" then
+				return data
+			end
+		end
+	end
+	-- fallback : raw (version eventuellement un peu ancienne)
+	local res, resError = httpGet(KEYS_RAW)
+	if res == nil then
+		return false, resError
+	end
+	local jsonOk, data = pcall(function() return HttpService:JSONDecode(res) end)
+	if jsonOk and type(data) == "table" then
+		return data
+	end
+	return false, "JSON invalide"
+end
+
+-- ================================================================
 --  Verification de la clé (base sur GitHub)
 -- ================================================================
 local function checkKey(key)
-	local res, resError = httpGet(KEYS_URL)
-	if res == nil then
-		return false, "Serveur injoignable, retente dans quelques secondes. (" .. resError .. ")"
-	end
-
-	local ok, data = pcall(function() return HttpService:JSONDecode(res) end)
-	if not ok or type(data) ~= "table" then
-		return false, "Base de clés indisponible. Retente plus tard."
+	local data = fetchKeysTable()
+	if type(data) ~= "table" then
+		return false, "Serveur injoignable, retente dans quelques secondes. (" .. tostring(data) .. ")"
 	end
 
 	local entry = data[key]
