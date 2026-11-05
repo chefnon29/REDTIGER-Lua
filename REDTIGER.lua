@@ -1,4 +1,4 @@
-﻿--/$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+--/$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 --  RedTiger - Key System (loader v1.2)
 --  - Fenêtre de clé : rien ne se lance sans clé valide
 --  - Session surveillée : clé expirée/supprimée = panel fermé,
