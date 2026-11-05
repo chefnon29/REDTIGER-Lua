@@ -23,5 +23,14 @@
     "mask": "REDTIGER-****-****-NM7D",
     "pkey": "sgnfbuQI1rjzZJKXSBK9Qg=="
   },
-  "_retired": []
+  "_retired": [],
+  "8B16BEFC098B4E69": {
+    "mask": "REDTIGER-****-****-K25V",
+    "vkey": "AqisqCyeHh7LR7ESUHQz7gvhHczn4vY=",
+    "duration": "1h",
+    "created": 1793899018,
+    "expires": 1793902618,
+    "hwid": null,
+    "pkey": "BCtvgZ7T+VHe5ymIxobKow=="
+  }
 }
