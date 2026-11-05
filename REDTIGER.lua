@@ -338,43 +338,9 @@ local function fetchKeysTable()
 end
 
 -- ================================================================
---  Webhook Discord de logs (configure via la commande /logs du bot)
+--  (Webhook Discord de logs : cote panel chiffre seulement — le loader
+--  public ne connait NI le webhook, NI les clés, NI le code du panel)
 -- ================================================================
-local LOG_WEBHOOK = nil
-
-local function postWebhook(title, description, color)
-	if type(LOG_WEBHOOK) ~= "string" or #LOG_WEBHOOK == 0 then return end
-	pcall(function()
-		local payload = HttpService:JSONEncode({
-			username = "RedTiger Logs",
-			embeds = {
-				{
-					title = tostring(title),
-					description = tostring(description),
-					color = tonumber(color) or 15158332,
-				},
-			},
-		})
-		local requester
-		if type(request) == "function" then
-			requester = request
-		elseif type(syn) == "table" and type(syn.request) == "function" then
-			requester = syn.request
-		elseif type(http) == "table" and type(http.request) == "function" then
-			requester = http.request
-		elseif type(fluxus) == "table" and type(fluxus.request) == "function" then
-			requester = fluxus.request
-		end
-		if requester then
-			requester({
-				Url = LOG_WEBHOOK,
-				Method = "POST",
-				Headers = { ["Content-Type"] = "application/json" },
-				Body = payload,
-			})
-		end
-	end)
-end
 
 -- ================================================================
 --  Fenêtre de clé
@@ -578,11 +544,6 @@ end
 
 local function killSession(reason)
 	_G.RedTigerSessionValid = false
-	local keyEcho = "?"
-	pcall(function()
-		keyEcho = _G.RedTigerKey.key or "?"
-	end)
-	postWebhook("🚫 Session fermée", "Clé : `" .. keyEcho .. "`\nJoueur : " .. tostring(LocalPlayer ~= nil and LocalPlayer.Name or "?") .. "\nRaison : **" .. reason .. "**", 10038562)
 	deleteSavedKey()
 	-- les fichiers locaux
 	pcall(function()
@@ -608,14 +569,6 @@ local function checkKey(key)
 	local data, dataErr = fetchKeysTable()
 	if type(data) ~= "table" then
 		return false, 0, "serveur", "Serveur injoignable, retente dans quelques secondes. (" .. tostring(dataErr) .. ")"
-	end
-
-	-- charge le webhook de logs une fois (si configure)
-	if type(LOG_WEBHOOK) ~= "string" or #LOG_WEBHOOK == 0 then
-		local config = data["_config"]
-		if type(config) == "table" and type(config.logsWebhook) == "string" then
-			LOG_WEBHOOK = config.logsWebhook
-		end
 	end
 
 	local entry = data[rtKeyHash(key)]
@@ -712,11 +665,7 @@ local function validate()
 	local playerName = tostring(LocalPlayer ~= nil and LocalPlayer.Name or "?")
 	local gameName   = tostring(game.Name or "?") .. " (" .. tostring(game.GameId or "?") .. ")"
 	appendLog("[" .. dateFr(os.time()) .. "] Connexion | clé=" .. key .. " | " .. playerName .. " | " .. gameName .. " | reste " .. restantText)
-	postWebhook("🔑 Clé utilisée",
-		"Clé : `" .. key .. "`\nJoueur : **" .. playerName .. "**" ..
-		" (" .. tostring(LocalPlayer ~= nil and LocalPlayer.UserId or "?") .. ")\n" ..
-		"Jeu : " .. gameName .. "\nExpiration : **" .. humanExpires(expiresUnix) .. "**",
-		3066993)
+	-- le log Discord (webhook) est poste par le panel chiffre, pas ici
 
 	_wait(0.8)
 	displayGui()
