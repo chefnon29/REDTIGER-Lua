@@ -2,16 +2,21 @@
   "_config": {
     "logsWebhook": "https://discord.com/api/webhooks/1567938882001960960/y4pTufjDvV0638Lbdhilb4b37z04YPXo_98srEpQB7oOh2066BHfBfrmf54meOI5bb8p"
   },
-  "REDTIGER-LCZH-GUMP-P5XB": {
+  "62F7405017E12E9F": {
     "duration": "1h",
     "created": 1793896647,
     "expires": 1793900247,
-    "hwid": null
+    "hwid": null,
+    "mask": "REDTIGER-****-****-P5XB",
+    "pkey": "sM780NxRuUGR2RnX7biSow=="
   },
-  "REDTIGER-5E6W-SWYN-LLAM": {
+  "494E1C0C11D04CBF": {
     "duration": "1h",
     "created": 1793896972,
     "expires": 1793900572,
-    "hwid": null
-  }
+    "hwid": null,
+    "mask": "REDTIGER-****-****-LLAM",
+    "pkey": "SvaVCsKyq6c5w6r0KwD1Bw=="
+  },
+  "_retired": []
 }
