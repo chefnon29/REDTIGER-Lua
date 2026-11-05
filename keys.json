@@ -1,5 +1,11 @@
 {
   "_config": {
     "logsWebhook": "https://discord.com/api/webhooks/1567938882001960960/y4pTufjDvV0638Lbdhilb4b37z04YPXo_98srEpQB7oOh2066BHfBfrmf54meOI5bb8p"
+  },
+  "REDTIGER-LCZH-GUMP-P5XB": {
+    "duration": "1h",
+    "created": 1793896647,
+    "expires": 1793900247,
+    "hwid": null
   }
 }
