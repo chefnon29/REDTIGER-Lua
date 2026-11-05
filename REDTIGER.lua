@@ -1,29 +1,33 @@
 ﻿--/$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
---  RedTiger - Key System (loader v1.1)
---  Un rien ne se lance que si une clé valide est fournie.
---  Les clés sont gerees depuis le bot Discord (durations 1h/1j/1semaine/etc)
+--  RedTiger - Key System (loader v1.2)
+--  - Fenêtre de clé : rien ne se lance sans clé valide
+--  - Session surveillée : clé expirée/supprimée = panel fermé,
+--    fichiers supprimés, joueur éjecté, logs postés
+--  - _G.RedTigerKey / _G.RedTigerSessionValid consommés par Panel.lua
 --/$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
 print("[RedTiger] Loader demarre - verification de la clé...")
 
 local Players     = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
+local LocalPlayer = Players.LocalPlayer
 
 local REPO_RAW  = "https://raw.githubusercontent.com/chefnon29/REDTIGER-Lua/refs/heads/main"
 local KEYS_API  = "https://api.github.com/repos/chefnon29/REDTIGER-Lua/contents/keys.json"
 local KEYS_RAW  = REPO_RAW .. "/keys.json"
 local PANEL_URL = REPO_RAW .. "/Panel.lua"
 local KEY_FILE  = "RedTiger/key.txt"
+local LOGS_FILE = "RedTiger/logs.txt"
 
+-- ================================================================
+--  Aides diverses
+-- ================================================================
 local globalWait = wait
 local function _wait(seconds)
 	if task ~= nil and task.wait ~= nil then return task.wait(seconds) end
 	return globalWait(seconds)
 end
 
--- ================================================================
---  HTTP (3 essais + cache-bust)
--- ================================================================
 local function httpGet(url)
 	local lastError = ""
 	for i = 1, 3 do
@@ -40,9 +44,6 @@ local function httpGet(url)
 	return nil, lastError
 end
 
--- ================================================================
---  Cle : normalisation + sauvegarde local (auto-remplissage)
--- ================================================================
 local function normalizeKey(input)
 	local key = tostring(input or ""):upper()
 	key = key:gsub("%s", "")
@@ -60,6 +61,25 @@ local function saveKey(key)
 	end)
 end
 
+local function deleteSavedKey()
+	pcall(function()
+		if delfile ~= nil and isfile ~= nil and isfile(KEY_FILE) then
+			delfile(KEY_FILE)
+		end
+	end)
+end
+
+local function appendLog(line)
+	pcall(function()
+		if appendfile then
+			if isfolder ~= nil and makefolder ~= nil and not isfolder("RedTiger") then
+				makefolder("RedTiger")
+			end
+			appendfile(LOGS_FILE, line .. "\n")
+		end
+	end)
+end
+
 local function loadSavedKey()
 	local key
 	pcall(function()
@@ -73,8 +93,16 @@ local function loadSavedKey()
 	return nil
 end
 
+local function dateFr(timestamp)
+	local ok, result = pcall(function()
+		return os.date("%d/%m/%Y a %H:%M", timestamp)
+	end)
+	if ok and result ~= nil then return tostring(result) end
+	return "date inconnue"
+end
+
 -- ================================================================
---  HWID : identifiant unique du PC/execiteur
+--  HWID
 -- ================================================================
 local HWID = "unknown"
 do
@@ -91,9 +119,8 @@ do
 		pcall(function() id = "exec-" .. tostring(getExecutorName()) end)
 	end
 	if not id or #id == 0 then
-		local ok, lp = pcall(function() return Players.LocalPlayer end)
-		if ok and lp ~= nil then
-			id = "user-" .. tostring(lp.UserId)
+		if LocalPlayer ~= nil then
+			id = "user-" .. tostring(LocalPlayer.UserId)
 		else
 			id = "unk-" .. tostring(math.random(100000, 999999))
 		end
@@ -102,15 +129,16 @@ do
 end
 
 -- ================================================================
---  Formatage de la duree restante (pour le message de bienvenue)
+--  Temps restant
 -- ================================================================
-local function humanRemaining(seconds)
-	if seconds == math.huge then return "a vie" end
-	seconds = tonumber(seconds) or 0
-	if seconds <= 0 then return "illimitee" end
-	local days    = math.floor(seconds / 86400)
-	local hours   = math.floor((seconds % 86400) / 3600)
-	local minutes = math.floor((seconds % 3600) / 60)
+local function humanExpires(expiresNow)
+	expiresNow = tonumber(expiresNow) or 0
+	if expiresNow <= 0 then return "a vie" end
+	local restant = expiresNow - os.time()
+	if restant <= 0 then return "expirée" end
+	local days    = math.floor(restant / 86400)
+	local hours   = math.floor((restant % 86400) / 3600)
+	local minutes = math.floor((restant % 3600) / 60)
 	if days > 1 then return tostring(days) .. " jours" end
 	if days == 1 then return "1 jour " .. tostring(hours) .. " h" end
 	if hours > 1 then return tostring(hours) .. " h " .. tostring(minutes) .. " min" end
@@ -118,9 +146,107 @@ local function humanRemaining(seconds)
 end
 
 -- ================================================================
+--  base64
+-- ================================================================
+local B64CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+local function b64decode(data)
+	data = data:gsub("[^" .. B64CHARS .. "=]", "")
+	data = (data:gsub(".", function(x)
+		if x == "=" then return "" end
+		local r, f = "", (B64CHARS:find(x) - 1)
+		for i = 6, 1, -1 do
+			r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and "1" or "0")
+		end
+		return r
+	end))
+	return (data:gsub("%d%d?%d?%d?%d?%d?%d?%d?", function(x)
+		if #x ~= 8 then return "" end
+		local c = 0
+		for i = 1, 8 do
+			c = c + (x:sub(i, i) == "1" and 2 ^ (8 - i) or 0)
+		end
+		return string.char(c)
+	end))
+end
+
+-- ================================================================
+--  Base de clés : API GitHub (fraiche) puis raw (fallback)
+-- ================================================================
+local function fetchKeysTable()
+	local ok, envelope = pcall(function()
+		local raw = httpGet(KEYS_API)
+		return HttpService:JSONDecode(raw)
+	end)
+	if ok and type(envelope) == "table" and type(envelope.content) == "string" then
+		local decoded = b64decode(envelope.content)
+		if decoded and #decoded > 0 then
+			local jsonOk, data = pcall(function() return HttpService:JSONDecode(decoded) end)
+			if jsonOk and type(data) == "table" then
+				return data
+			end
+		end
+	end
+	local res, resError = httpGet(KEYS_RAW)
+	if res == nil then
+		return false, resError
+	end
+	local jsonOk, data = pcall(function() return HttpService:JSONDecode(res) end)
+	if jsonOk and type(data) == "table" then
+		return data
+	end
+	return false, "JSON invalide"
+end
+
+-- ================================================================
+--  Webhook Discord de logs (configure via la commande /logs du bot)
+-- ================================================================
+local LOG_WEBHOOK = nil
+
+local function postWebhook(title, description, color)
+	if type(LOG_WEBHOOK) ~= "string" or #LOG_WEBHOOK == 0 then return end
+	pcall(function()
+		local payload = HttpService:JSONEncode({
+			username = "RedTiger Logs",
+			embeds = {
+				{
+					title = tostring(title),
+					description = tostring(description),
+					color = tonumber(color) or 15158332,
+				},
+			},
+		})
+		local requester
+		if type(request) == "function" then
+			requester = request
+		elseif type(syn) == "table" and type(syn.request) == "function" then
+			requester = syn.request
+		elseif type(http) == "table" and type(http.request) == "function" then
+			requester = http.request
+		elseif type(fluxus) == "table" and type(fluxus.request) == "function" then
+			requester = fluxus.request
+		end
+		if requester then
+			requester({
+				Url = LOG_WEBHOOK,
+				Method = "POST",
+				Headers = { ["Content-Type"] = "application/json" },
+				Body = payload,
+			})
+		end
+	end)
+end
+
+-- ================================================================
 --  Fenêtre de clé
 -- ================================================================
-local statusLabel, keyBox, verifyButton, clientIdLabel
+local statusLabel, keyBox, verifyButton
+
+local function guiStatus(text)
+	pcall(function()
+		if statusLabel ~= nil then statusLabel.Text = tostring(text) end
+	end)
+end
 
 local success, gui = pcall(function()
 	local screenGui        = Instance.new("ScreenGui")
@@ -132,7 +258,7 @@ local success, gui = pcall(function()
 			syn.protect_gui(screenGui)
 		end
 	end)
-	screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 	local frame            = Instance.new("Frame")
 	frame.Name             = "KeyFrame"
@@ -173,7 +299,7 @@ local success, gui = pcall(function()
 	hint.TextSize     = 13
 	hint.Parent       = frame
 
-	clientIdLabel     = Instance.new("TextLabel")
+	local clientIdLabel = Instance.new("TextLabel")
 	clientIdLabel.Size = UDim2.new(1, -20, 0, 16)
 	clientIdLabel.Position = UDim2.new(0, 10, 0, 60)
 	clientIdLabel.BackgroundTransparency = 1
@@ -236,14 +362,91 @@ if not success or gui == nil then
 	return
 end
 
-local function setStatus(text)
-	pcall(function() statusLabel.Text = tostring(text) end)
+-- ================================================================
+--  Fermeture TOTALE (clé expirée / supprimée / tamponné)
+--  Rien ne peut la contourner : panel détruit + fichiers
+--  supprimés + Kick hard du joueur + log webhook
+-- ================================================================
+_G.RedTigerSessionValid = false
+
+local function displayGui()
+	pcall(function()
+		if gui ~= nil and gui.Parent ~= nil then
+			gui:Destroy()
+		end
+	end)
+	pcall(function()
+		local core = game:GetService("CoreGui")
+		for _, child in ipairs(core:GetChildren()) do
+			if child.Name == "RedTigerKeySystem" or child.Name == "Xinve" then
+				child:Destroy()
+			end
+		end
+	end)
+	pcall(function()
+		if LocalPlayer ~= nil then
+			for _, child in ipairs(LocalPlayer:GetChildren()) do
+				if child:IsA("ScreenGui") and (child.Name == "RedTigerKeySystem" or child.Name == "Xinve") then
+					child:Destroy()
+				end
+			end
+		end
+	end)
 end
 
-local function destroyGui()
+local function killSession(reason)
+	_G.RedTigerSessionValid = false
+	local keyEcho = "?"
 	pcall(function()
-		if gui ~= nil and gui.Parent ~= nil then gui:Destroy() end
+		keyEcho = _G.RedTigerKey.key or "?"
 	end)
+	postWebhook("🚫 Session fermée", "Clé : `" .. keyEcho .. "`\nJoueur : " .. tostring(LocalPlayer ~= nil and LocalPlayer.Name or "?") .. "\nRaison : **" .. reason .. "**", 10038562)
+	deleteSavedKey()
+	-- les fichiers locaux
+	pcall(function()
+		if isfile ~= nil and delfile ~= nil and isfile(LOGS_FILE) then
+			delfile(LOGS_FILE)
+		end
+	end)
+	displayGui()
+	pcall(function()
+		LocalPlayer:Kick("RedTiger | " .. reason .. "\nLe panel a été fermé et supprimé. Demande a ton admin si besoin.")
+	end)
+	-- garde la coroutine bloquee (peu utile apres kick, mais par securite)
+	while true do
+		_wait(1)
+	end
+end
+
+-- ================================================================
+--  Verification : retourne ok, expiresUnix, tag
+--  tag = "invalide" | "expire" | "serveur" | nil
+-- ================================================================
+local function checkKey(key)
+	local data, dataErr = fetchKeysTable()
+	if type(data) ~= "table" then
+		return false, 0, "serveur", "Serveur injoignable, retente dans quelques secondes. (" .. tostring(dataErr) .. ")"
+	end
+
+	-- charge le webhook de logs une fois (si configure)
+	if type(LOG_WEBHOOK) ~= "string" or #LOG_WEBHOOK == 0 then
+		local config = data["_config"]
+		if type(config) == "table" and type(config.logsWebhook) == "string" then
+			LOG_WEBHOOK = config.logsWebhook
+		end
+	end
+
+	local entry = data[key]
+	if type(entry) ~= "table" then
+		return false, 0, "invalide", "Clé invalide. Demande une clé a ton admin Discord."
+	end
+
+	local expires = tonumber(entry.expires) or 0
+	if expires > 0 and os.time() >= expires then
+		return false, expires, "expire", "Clé expiree. Demande-en une nouvelle ou un extension a ton admin."
+	end
+
+	return true, expires, nil
 end
 
 -- ================================================================
@@ -267,109 +470,90 @@ local function launchPanel()
 end
 
 -- ================================================================
---  Decodage base64 (pour reponse API GitHub)
--- ================================================================
-local B64CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-
-local function b64decode(data)
-	data = data:gsub("[^" .. B64CHARS .. "=]", "")
-	data = (data:gsub(".", function(x)
-		if x == "=" then return "" end
-		local r, f = "", (B64CHARS:find(x) - 1)
-		for i = 6, 1, -1 do
-			r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and "1" or "0")
-		end
-		return r
-	end))
-	return (data:gsub("%d%d?%d?%d?%d?%d?%d?%d?", function(x)
-		if #x ~= 8 then return "" end
-		local c = 0
-		for i = 1, 8 do
-			c = c + (x:sub(i, i) == "1" and 2 ^ (8 - i) or 0)
-		end
-		return string.char(c)
-	end))
-end
-
--- ================================================================
---  Recuperation de la base de clés :
---  1) API GitHub (toujours a jour, pas de cache CDN)
---  2) sinon raw.githubusercontent (peut avoir ~5 min de retard)
--- ================================================================
-local function fetchKeysTable()
-	local ok, envelope = pcall(function() return HttpService:JSONDecode(httpGet(KEYS_API)) end)
-	if ok and type(envelope) == "table" and type(envelope.content) == "string" then
-		local decoded = b64decode(envelope.content)
-		if decoded and #decoded > 0 then
-			local jsonOk, data = pcall(function() return HttpService:JSONDecode(decoded) end)
-			if jsonOk and type(data) == "table" then
-				return data
-			end
-		end
-	end
-	-- fallback : raw (version eventuellement un peu ancienne)
-	local res, resError = httpGet(KEYS_RAW)
-	if res == nil then
-		return false, resError
-	end
-	local jsonOk, data = pcall(function() return HttpService:JSONDecode(res) end)
-	if jsonOk and type(data) == "table" then
-		return data
-	end
-	return false, "JSON invalide"
-end
-
--- ================================================================
---  Verification de la clé (base sur GitHub)
--- ================================================================
-local function checkKey(key)
-	local data = fetchKeysTable()
-	if type(data) ~= "table" then
-		return false, "Serveur injoignable, retente dans quelques secondes. (" .. tostring(data) .. ")"
-	end
-
-	local entry = data[key]
-	if type(entry) ~= "table" then
-		return false, "Cle invalide. Demande une clé a ton admin Discord."
-	end
-
-	local expires = tonumber(entry.expires) or 0
-	if expires > 0 then
-		local now = os.time()
-		if now >= expires then
-			return false, "clé expiree. Demande-en une nouvelle a ton admin."
-		end
-		return true, expires - now
-	end
-	return true, math.huge
-end
-
--- ================================================================
---  Action de validation
+--  Validation (bouton / entree)
 -- ================================================================
 local function validate()
 	local key = normalizeKey(keyBox.Text)
 	if #key == 0 then
-		setStatus("âš  Entre ta clé avant de valider.")
+		guiStatus("⚠ Entre ta clé avant de valider.")
 		return
 	end
 
-	setStatus("Verification de la clé...")
+	guiStatus("Verification de la clé...")
 	verifyButton.Text = "Verification..."
 
-	local ok, result = checkKey(key)
+	local ok, expiresUnix, tag, message = checkKey(key)
 	if not ok then
-		setStatus("âŒ " .. tostring(result))
+		guiStatus("❌ " .. tostring(message))
 		verifyButton.Text = "Valider"
 		return
 	end
 
+	-- état global consommé par Panel.lua (garde + affichage temps restant)
+	_G.RedTigerKey = {
+		key = key,
+		expiresUnix = tonumber(expiresUnix) or 0,
+		hwid = HWID,
+		user = tostring(LocalPlayer and LocalPlayer.UserId or "?"),
+		game = tostring(game.Name or "?") .. "(" .. tostring(game.GameId or "?") .. ")",
+	}
+	_G.RedTigerSessionValid = true
 	saveKey(key)
-	local remainingText = humanRemaining(result)
-	setStatus("âœ… clé valide ! Bienvenue sur RedTiger. (" .. remainingText .. ")")
+
+	local restantText = humanExpires(expiresUnix)
+	guiStatus("✅ Clé valide ! Bienvenue sur RedTiger. (" .. restantText .. ")")
 	verifyButton.Text = "Connecte"
+
+	local playerName = tostring(LocalPlayer ~= nil and LocalPlayer.Name or "?")
+	local gameName   = tostring(game.Name or "?") .. " (" .. tostring(game.GameId or "?") .. ")"
+	appendLog("[" .. dateFr(os.time()) .. "] Connexion | clé=" .. key .. " | " .. playerName .. " | " .. gameName .. " | reste " .. restantText)
+	postWebhook("🔑 Clé utilisée",
+		"Clé : `" .. key .. "`\nJoueur : **" .. playerName .. "**" ..
+		" (" .. tostring(LocalPlayer ~= nil and LocalPlayer.UserId or "?") .. ")\n" ..
+		"Jeu : " .. gameName .. "\nExpiration : **" .. humanExpires(expiresUnix) .. "**",
+		3066993)
+
 	_wait(0.8)
-	destroyGui()
+	displayGui()
+
+	-- boucle locale : kill a la seconde pres quand l'horloge passe
+	task.spawn(function()
+		while true do
+			_wait(10)
+			if type(_G.RedTigerSessionValid) ~= "boolean" or not _G.RedTigerSessionValid then
+				break -- deja tuée (par le panel par exemple)
+			end
+			local exp = tonumber(_G.RedTigerKey ~= nil and _G.RedTigerKey.expiresUnix or 0) or 0
+			if exp > 0 and os.time() >= exp then
+				killSession("Clé expirée (temps restant : 0).")
+				break
+			end
+		end
+	end)
+
+	-- boucle distante : re-verification toutes les 2-3 min (detecte
+	-- /delkey du bot, expirations l'echelle de temps, revocation)
+	task.spawn(function()
+		while true do
+			_wait(180)
+			if type(_G.RedTigerSessionValid) ~= "boolean" or not _G.RedTigerSessionValid then
+				break
+			end
+			local currentKey = normalizeKey((_G.RedTigerKey or {}).key)
+			local okr, expiresNow, tagR, messageR = checkKey(currentKey)
+			if not okr then
+				if tagR == "invalide" or tagR == "expire" then
+					killSession("Clé " .. (tagR == "invalide" and "supprimée" or "expirée") .. " (recheck serveur)")
+					break
+				end
+				-- tag "serveur" : réseau en panne -> on reaffiche rien, on retente plus tard
+			else
+				-- met à jour l'expiration si le bot a fait /extend
+				_G.RedTigerKey.expiresUnix = expiresNow or 0
+			end
+		end
+	end)
+
 	launchPanel()
 end
 
@@ -378,4 +562,4 @@ keyBox.FocusLost:Connect(function(enterPressed)
 	if enterPressed then validate() end
 end)
 
-setStatus("Pret. Entre ta clé puis clique Valider (ou appuie sur Entree).")
+guiStatus("Pret. Entre ta clé puis clique Valider (ou appuie sur Entree).")

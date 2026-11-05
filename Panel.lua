@@ -1,3 +1,65 @@
+--/$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+--  RedTiger Key System - SECURITE (ne pas retirer)
+--  1. Le panel ne demarre QUE si _G.RedTigerKey existe (loader valide)
+--  2. Re-validation INDEPENDANTE au demarrage + re-check periodique
+--     : clÃ© expirÃ©e/supprimÃ©e = session fermÃ©e par le panel lui-meme
+--/$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+
+if type(_G.RedTigerKey) ~= "table" or type(_G.RedTigerKey.key) ~= "string" or #_G.RedTigerKey.key < 4 then
+	warn("[RedTiger] Panel lance sans clÃ© RedTiger. Rien ne se lance.")
+	return
+end
+
+do -- Verification distante independante au demarrage (anti-fake de _G)
+	local __validated = false
+	local data = nil
+	pcall(function()
+		local http = game:GetService("HttpService")
+		local ok, raw = pcall(function()
+			return game:HttpGet("https://api.github.com/repos/chefnon29/REDTIGER-Lua/contents/keys.json?v=" .. tostring(os.time()))
+		end)
+		if not ok or type(raw) ~= "string" then return end
+		local env = http:JSONDecode(raw)
+		if type(env) ~= "table" or type(env.content) ~= "string" then return end
+		local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+		local payload = env.content:gsub("[^" .. chars .. "=]", "")
+		payload = (payload:gsub(".", function(x)
+			if x == "=" then return "" end
+			local r, f = "", (chars:find(x) - 1)
+			for i = 6, 1, -1 do
+				r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and "1" or "0")
+			end
+			return r
+		end))
+		local decoded = (payload:gsub("%d%d?%d?%d?%d?%d?%d?%d?", function(x)
+			if #x ~= 8 then return "" end
+			local c = 0
+			for i = 1, 8 do
+				c = c + (x:sub(i, i) == "1" and 2 ^ (8 - i) or 0)
+			end
+			return string.char(c)
+		end))
+		data = http:JSONDecode(decoded)
+	end)
+	local entry = type(data) == "table" and data[_G.RedTigerKey.key] or nil
+	if type(data) == "table" then
+		if type(entry) ~= "table" then
+			warn("[RedTiger] Cle introuvable/deleted sur le serveur. Panel bloque.")
+			return
+		end
+		local exp = tonumber(entry.expires) or 0
+		if exp > 0 and os.time() >= exp then
+			warn("[RedTiger] Cle expiree. Panel bloque.")
+			return
+		end
+		_G.RedTigerKey.expiresUnix = exp
+		__validated = true
+	else
+		warn("[RedTiger] Serveur de cles injoignable. Panel bloque (securite).")
+		return
+	end
+end
+-- ---------- ci-dessous : ton code de panel d'origine ----------
 local GG = {
 	Language = {
 		CheckboxEnabled = "Enabled",
@@ -2041,8 +2103,8 @@ function Library:create_ui()
 					or "..."
 				KeybindLabel.Parent = KeybindBox
 
-				-- Le carré devient le bouton cliquable : cliquer sur la ligne
-				-- ne coche/decoche plus, seul le carré compte
+				-- Le carrÃƒÂ© devient le bouton cliquable : cliquer sur la ligne
+				-- ne coche/decoche plus, seul le carrÃƒÂ© compte
 				local Box = Instance.new("TextButton")
 				Box.Text = ""
 				Box.AutoButtonColor = false
@@ -2100,7 +2162,7 @@ function Library:create_ui()
 					CheckboxManager:change_state(Library._config._flags[settings.flag])
 				end
 
-				-- Seul le carré a droite coche/decoche, pas la ligne entiere
+				-- Seul le carrÃƒÂ© a droite coche/decoche, pas la ligne entiere
 				Box.MouseButton1Click:Connect(function()
 					CheckboxManager:change_state(not CheckboxManager._state)
 				end)
@@ -2226,7 +2288,7 @@ function Library:create_ui()
 				TitleLabel.Parent = Button
 
 				-- Carre a droite, exactement comme la case des checkboxes
-				-- C'est LE carré cliquable : la ligne entiere n'active plus le bouton
+				-- C'est LE carrÃƒÂ© cliquable : la ligne entiere n'active plus le bouton
 				local Box = Instance.new("TextButton")
 				Box.Text = ""
 				Box.AutoButtonColor = false
@@ -2293,7 +2355,7 @@ function Library:create_ui()
 						end
 					end
 					local savedMode = Library._config._flags[settings.flag]
-					if savedMode == "Multicolore" or savedMode == "Personnalisée" then
+					if savedMode == "Multicolore" or savedMode == "PersonnalisÃƒÂ©e" then
 						ColorManager._mode = savedMode
 					end
 				end
@@ -2332,7 +2394,7 @@ function Library:create_ui()
 				end
 
 				-- Carre de couleur a droite (affiche la couleur actuelle)
-				-- Carre de couleur a droite : c'est LE carré cliquable
+				-- Carre de couleur a droite : c'est LE carrÃƒÂ© cliquable
 				-- qui ouvre la roue de couleurs, pas la ligne entiere
 				local Swatch = Instance.new("TextButton")
 				Swatch.Text = ""
@@ -2480,14 +2542,14 @@ function Library:create_ui()
 					DragZone.Active = true
 					DragZone.Parent = Popup
 
-					-- Poignée de drag (icone de deplacement) a gauche du titre
+					-- PoignÃƒÂ©e de drag (icone de deplacement) a gauche du titre
 					local Grip = Instance.new("TextLabel")
 					Grip.BackgroundTransparency = 1
 					Grip.Size = UDim2.fromOffset(14, 14)
 					Grip.Position = UDim2.new(0, 1, 0, 8)
 					Grip.Font = Enum.Font.SourceSansBold
 					Grip.TextSize = 12
-					Grip.Text = "☰"
+					Grip.Text = "Ã¢ËœÂ°"
 					Grip.TextColor3 = Color3.fromRGB(255, 255, 255)
 					Grip.TextTransparency = 0.4
 					Grip.ZIndex = 106
@@ -2701,7 +2763,7 @@ function Library:create_ui()
 						PreviewLabel.Text = string.format("R:%d  G:%d  B:%d",
 							math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
 						refreshHandles()
-						applyColor(c, "Personnalisée", silent)
+						applyColor(c, "PersonnalisÃƒÂ©e", silent)
 					end
 
 					-- Interaction avec la roue
@@ -2782,7 +2844,7 @@ function Library:create_ui()
 					return Popup
 				end
 
-				-- Seul le carré de couleur ouvre la roue, pas la ligne entiere
+				-- Seul le carrÃƒÂ© de couleur ouvre la roue, pas la ligne entiere
 				Swatch.MouseButton1Click:Connect(function()
 					if not ColorManager._popup then
 						ColorManager._popup = buildPopup()
@@ -2805,7 +2867,7 @@ function Library:create_ui()
 
 				-- Restaure un mode + couleur sauvegardes (Recharger la config / code)
 				function ColorManager:set_saved(mode: string, rgbString: string?)
-					if mode == "Personnalisée" and rgbString then
+					if mode == "PersonnalisÃƒÂ©e" and rgbString then
 						local r, g, b = string.match(rgbString, "^(%d+),(%d+),(%d+)$")
 						if r and g and b then
 							applyColor(Color3.fromRGB(tonumber(r), tonumber(g), tonumber(b)), mode)
@@ -3780,7 +3842,7 @@ function Library:create_ui()
 	end
 
 	-- Touche d'ouverture du panel (personnalisable via l'onglet Parametres,
-	-- sauvegardée dans la config)
+	-- sauvegardÃƒÂ©e dans la config)
 	self._toggle_key = Enum.KeyCode.LeftControl
 	do
 		local savedKey = Library._config._keybinds and Library._config._keybinds['panel_toggle']
@@ -3881,8 +3943,8 @@ local DetectionTab = library:create_tab("Detection", "rbxassetid://1260179074776
 local MiscTab = library:create_tab("Misc", "rbxassetid://126017907477623")
 local ParametresTab = library:create_tab("Parametres", "rbxassetid://126017907477623")
 -- ============================================================
--- INTERFASSE : bibliothèque UI uniquement (catégories/tabs)
--- Le système de jeu a été retiré. Les autres scripts peuvent
+-- INTERFASSE : bibliothÃƒÂ¨que UI uniquement (catÃƒÂ©gories/tabs)
+-- Le systÃƒÂ¨me de jeu a ÃƒÂ©tÃƒÂ© retirÃƒÂ©. Les autres scripts peuvent
 -- utiliser l'interface via _G.XinveLibrary
 -- ============================================================
 
@@ -3897,7 +3959,7 @@ _G.XinveTabs = {
 
 -- ============================================================
 -- FEATURES : portage du panel REDTIGER dans l'UI Xinve
--- Tout le code d'exécuteur a été retiré (getgenv, writefile,
+-- Tout le code d'exÃƒÂ©cuteur a ÃƒÂ©tÃƒÂ© retirÃƒÂ© (getgenv, writefile,
 -- readfile, setclipboard, loadstring, CoreGui, etc.)
 -- ============================================================
 
@@ -3912,7 +3974,7 @@ local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
 -- ============================================================
--- FONCTIONNALITÉS (fusionnées depuis l'ancien script)
+-- FONCTIONNALITÃƒâ€°S (fusionnÃƒÂ©es depuis l'ancien script)
 -- ============================================================
 local tabs = {
 	Main = AutoparryTab,
@@ -3921,7 +3983,7 @@ local tabs = {
 	Parametres = ParametresTab
 }
 
--- ==================== ÉTAT ====================
+-- ==================== Ãƒâ€°TAT ====================
 local S = {
 	espEnabled = false,
 	noclipEnabled = false,
@@ -3962,7 +4024,7 @@ local S = {
 	fpsSaved = {},
 	flyVelocity = nil,
 	flyGyro = nil,
-	-- ---- Fonctionnalités portées du script lock ----
+	-- ---- FonctionnalitÃƒÂ©s portÃƒÂ©es du script lock ----
 	lockBotEnabled = false,
 	holdLockEnabled = false,
 	holdLockBotEnabled = false,
@@ -4042,7 +4104,7 @@ local function getSharedEspHue()
 end
 
 local function getVisualColor(mode, customColor, hueOffset)
-	if mode == "Personnalisée" then return customColor end
+	if mode == "PersonnalisÃƒÂ©e" then return customColor end
 	local preset = ESP_COLOR_PRESETS[mode]
 	if preset then return preset end
 	return Color3.fromHSV(hueOffset, 1, 1)
@@ -4065,7 +4127,7 @@ local function getHpColor(hueOffset)
 end
 
 local function getESPColor(p)
-	if S.espColorMode == "Personnalisée" then return S.espCustomColor end
+	if S.espColorMode == "PersonnalisÃƒÂ©e" then return S.espCustomColor end
 	local preset = ESP_COLOR_PRESETS[S.espColorMode]
 	if preset then return preset end
 	local team = p.Team
@@ -4185,7 +4247,7 @@ RunService.RenderStepped:Connect(function()
 							end
 						end
 					end
-					-- taille max à 15 studs, rétrécit jusqu'à 30% vers 250 studs
+					-- taille max ÃƒÂ  15 studs, rÃƒÂ©trÃƒÂ©cit jusqu'ÃƒÂ  30% vers 250 studs
 					local sc = math.clamp(1 - (dist - 15) / 235, 0.3, 1)
 					if obj.scale and obj.scale.Parent then
 						obj.scale.Scale = sc
@@ -4688,11 +4750,11 @@ local function disableBlackSky()
 	S.blackSkySaved = {}
 end
 
--- ==================== FONCTIONNALITÉS PORTÉES DU SCRIPT LOCK ====================
+-- ==================== FONCTIONNALITÃƒâ€°S PORTÃƒâ€°ES DU SCRIPT LOCK ====================
 -- (Hold Lock, Hold Lock Bot, Lock Bot, FOV Lock, Auto Tir,
---  ESP Squelette/Tracers, ESP Barre de PV, Compteur de Dégâts)
+--  ESP Squelette/Tracers, ESP Barre de PV, Compteur de DÃƒÂ©gÃƒÂ¢ts)
 
--- Partie visée selon le choix Tete / Torse / Racine
+-- Partie visÃƒÂ©e selon le choix Tete / Torse / Racine
 local function getAimPart(char)
 	if not char then return nil end
 	if S.aimPart == "Torse" then
@@ -4703,12 +4765,12 @@ local function getAimPart(char)
 	return char:FindFirstChild("Head")
 end
 
--- ==================== DÉTECTION DES BOTS ====================
--- Un "bot" : personnage (Model avec Humanoid) qui n'appartient à aucun joueur.
--- Le workspace n'est scanné que si une fonctionnalité bot est active.
+-- ==================== DÃƒâ€°TECTION DES BOTS ====================
+-- Un "bot" : personnage (Model avec Humanoid) qui n'appartient ÃƒÂ  aucun joueur.
+-- Le workspace n'est scannÃƒÂ© que si une fonctionnalitÃƒÂ© bot est active.
 local lockBotCharacters = {}
 
--- Suivi incrémental des Humanoids du workspace : le workspace n'est
+-- Suivi incrÃƒÂ©mental des Humanoids du workspace : le workspace n'est
 -- parcouru qu'UNE SEULE FOIS au demarrage. Ensuite, la liste est
 -- maintenue via DescendantAdded / DescendantRemoving (quasi gratuit),
 -- au lieu de rescanner tout le workspace toutes les 2 secondes.
@@ -4789,7 +4851,7 @@ task.spawn(function()
 end)
 
 -- ==================== HELPERS GUI / CERCLE FOV (FOV Lock) ====================
--- Crée un ScreenGui plein écran pour les visuels (cercle FOV, ESP, tracers)
+-- CrÃƒÂ©e un ScreenGui plein ÃƒÂ©cran pour les visuels (cercle FOV, ESP, tracers)
 local function makeLockScreenGui(name, displayOrder)
 	local g = Instance.new("ScreenGui")
 	g.Name = name
@@ -4799,7 +4861,7 @@ local function makeLockScreenGui(name, displayOrder)
 	g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	g.ScreenInsets = Enum.ScreenInsets.None
 	g.Enabled = true
-	-- Parenté au CoreGui comme le panel : reste visible même avec le
+	-- ParentÃƒÂ© au CoreGui comme le panel : reste visible mÃƒÂªme avec le
 	-- menu Roblox ouvert, mais juste en dessous du panel (2147483646 < 2147483647)
 	local ok = pcall(function()
 		g.Parent = CoreGui
@@ -4838,7 +4900,7 @@ fovGradient.Parent = fovStroke
 local fovHueOffset = 0
 
 -- Rayon du cercle FOV en pixels = vraie FOV angulaire du lock
--- (projection réelle de la caméra, comme un vrai aimbot FOV).
+-- (projection rÃƒÂ©elle de la camÃƒÂ©ra, comme un vrai aimbot FOV).
 local function lockGetFovCircleRadius(cam)
 	if not cam then return 0 end
 	local halfLock = math.rad(S.fovLockFov) / 2
@@ -4848,7 +4910,7 @@ local function lockGetFovCircleRadius(cam)
 	return math.clamp(r, 15, maxR)
 end
 
--- Vérifie que la cible est DEVANT la caméra (et dans le cercle FOV si actif)
+-- VÃƒÂ©rifie que la cible est DEVANT la camÃƒÂ©ra (et dans le cercle FOV si actif)
 local aimFovBypass = false
 local function lockIsInFront(part)
 	local cam = workspace.CurrentCamera
@@ -4870,8 +4932,8 @@ local function lockIsInFront(part)
 	return look:Dot(dir) > 0.1
 end
 
--- Vérifie la ligne de vue : la cible ne doit pas être derrière un mur
--- Option "Lock à travers murs" : ignore le raycast (utile dans les jeux
+-- VÃƒÂ©rifie la ligne de vue : la cible ne doit pas ÃƒÂªtre derriÃƒÂ¨re un mur
+-- Option "Lock ÃƒÂ  travers murs" : ignore le raycast (utile dans les jeux
 -- ou des murs invisibles / accessoires bloquent le raycast et empechent
 -- le lock de trouver une cible alors que l'ESP les voit)
 local function lockHasLineOfSight(part)
@@ -4912,7 +4974,7 @@ RunService:BindToRenderStep("XinveFovCircle", Enum.RenderPriority.Camera.Value +
 end)
 
 -- ==================== AUTO TIR ====================
--- Relâche le clic droit simulé maintenu par l'auto tir
+-- RelÃƒÂ¢che le clic droit simulÃƒÂ© maintenu par l'auto tir
 local function releaseAutoShootClick()
 	pcall(function()
 		local vim = game:GetService("VirtualInputManager")
@@ -4928,8 +4990,8 @@ local function setAutoShoot(state)
 	if state == S.autoShootEnabled then return end
 	S.autoShootEnabled = state
 	if state then
-		-- Exclusion mutuelle : l'auto tir désactive les hold locks
-		-- (le clic droit simulé ne doit pas déclencher le lock)
+		-- Exclusion mutuelle : l'auto tir dÃƒÂ©sactive les hold locks
+		-- (le clic droit simulÃƒÂ© ne doit pas dÃƒÂ©clencher le lock)
 		S.holdLockEnabled = false
 		S.holdLockBotEnabled = false
 	else
@@ -4957,14 +5019,14 @@ local function setHoldLockBot(state)
 	end
 end
 
--- Boucle d'auto tir : maintient la visée (clic droit), tire (touche E,
--- Tool, clic gauche). Le clic gauche n'est envoyé que si l'UI est fermée
+-- Boucle d'auto tir : maintient la visÃƒÂ©e (clic droit), tire (touche E,
+-- Tool, clic gauche). Le clic gauche n'est envoyÃƒÂ© que si l'UI est fermÃƒÂ©e
 -- pour ne pas cliquer sur les boutons du panel.
 task.spawn(function()
 	while true do
 		task.wait(0.1)
 		if S.autoShootEnabled then
-			-- Maintient le clic droit (visée)
+			-- Maintient le clic droit (visÃƒÂ©e)
 			pcall(function()
 				local vim = game:GetService("VirtualInputManager")
 				local cam = workspace.CurrentCamera
@@ -4979,7 +5041,7 @@ task.spawn(function()
 				task.wait(0.05)
 				vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 			end)
-			-- Active le Tool équipé
+			-- Active le Tool ÃƒÂ©quipÃƒÂ©
 			do
 				local char = player.Character
 				if char then
@@ -4989,7 +5051,7 @@ task.spawn(function()
 					end
 				end
 			end
-			-- Clic gauche au centre de l'écran (uniquement si l'UI est fermée)
+			-- Clic gauche au centre de l'ÃƒÂ©cran (uniquement si l'UI est fermÃƒÂ©e)
 			if library._ui_open ~= true then
 				pcall(function()
 					local vim = game:GetService("VirtualInputManager")
@@ -5007,8 +5069,8 @@ end)
 
 -- ==================== HOLD LOCK / HOLD LOCK BOT ====================
 -- Maintenir le clic droit = active le lock (joueurs ou bots),
--- relâcher = désactive. Pendant l'auto tir, le hold lock ne se
--- déclenche pas (le clic droit est simulé par l'auto tir).
+-- relÃƒÂ¢cher = dÃƒÂ©sactive. Pendant l'auto tir, le hold lock ne se
+-- dÃƒÂ©clenche pas (le clic droit est simulÃƒÂ© par l'auto tir).
 local holdLockActive = false
 RunService:BindToRenderStep("XinveHoldLock", Enum.RenderPriority.Camera.Value + 0, function()
 	if S.autoShootEnabled then
@@ -5103,7 +5165,7 @@ RunService:BindToRenderStep("XinveLockAim", Enum.RenderPriority.Last.Value, func
 		end
 	end
 
-	-- Lock Select : le joueur sélectionné uniquement
+	-- Lock Select : le joueur sÃƒÂ©lectionnÃƒÂ© uniquement
 	if not targetHead and S.lockSelectedEnabled then
 		local sel = getSelectedPlayer()
 		if sel and isAlive(sel) then
@@ -5114,7 +5176,7 @@ RunService:BindToRenderStep("XinveLockAim", Enum.RenderPriority.Last.Value, func
 		end
 	end
 
-	-- Auto-lock dégâts : cibler l'attaquant si on a pris des dégâts récemment
+	-- Auto-lock dÃƒÂ©gÃƒÂ¢ts : cibler l'attaquant si on a pris des dÃƒÂ©gÃƒÂ¢ts rÃƒÂ©cemment
 	if not targetHead and S.damageTarget and tick() < (S.damageExpire or 0) and isAlive(S.damageTarget) then
 		local head = getAimPart(S.damageTarget.Character)
 		if head and head.Parent and lockIsInFront(head) and lockHasLineOfSight(head) then
@@ -5122,8 +5184,8 @@ RunService:BindToRenderStep("XinveLockAim", Enum.RenderPriority.Last.Value, func
 		end
 	end
 
-	-- Auto-lock de proximité : joueur très proche
-	-- (désactivé en mode Lock Bot pour ne pas viser les joueurs à la place des bots)
+	-- Auto-lock de proximitÃƒÂ© : joueur trÃƒÂ¨s proche
+	-- (dÃƒÂ©sactivÃƒÂ© en mode Lock Bot pour ne pas viser les joueurs ÃƒÂ  la place des bots)
 	if not targetHead and not S.lockBotEnabled then
 		local proxNearest = S.lockProximityRange
 		for _, p in Players:GetPlayers() do
@@ -5160,7 +5222,7 @@ RunService:BindToRenderStep("XinveLockAim", Enum.RenderPriority.Last.Value, func
 		end
 	end
 
-	-- Lock Equipe Adverse : le plus proche d'une autre équipe
+	-- Lock Equipe Adverse : le plus proche d'une autre ÃƒÂ©quipe
 	if not targetHead and S.lockEnemyEnabled then
 		local myTeam = player.Team
 		local nearestDist = math.huge
@@ -5199,7 +5261,7 @@ RunService:BindToRenderStep("XinveLockAim", Enum.RenderPriority.Last.Value, func
 		end
 	end
 
-	-- Sécurité : si la cible est derrière la caméra, on refuse de la
+	-- SÃƒÂ©curitÃƒÂ© : si la cible est derriÃƒÂ¨re la camÃƒÂ©ra, on refuse de la
 	-- verrouiller (exception : cible collante, le lock la recentre)
 	if targetHead and not fromSticky and not lockIsInFront(targetHead) then
 		targetHead = nil
@@ -5212,7 +5274,7 @@ RunService:BindToRenderStep("XinveLockAim", Enum.RenderPriority.Last.Value, func
 			cam.CFrame = CFrame.lookAt(camPos, targetHead.Position)
 		end
 		S.hasLockedTarget = true
-		-- Mémorise la cible collante si c'est un joueur
+		-- MÃƒÂ©morise la cible collante si c'est un joueur
 		local targetChar = targetHead.Parent
 		for _, p in Players:GetPlayers() do
 			if p.Character == targetChar then
@@ -5231,8 +5293,8 @@ RunService:BindToRenderStep("XinveLockAim", Enum.RenderPriority.Last.Value, func
 	end
 end)
 
--- Détection de dégâts : auto-lock sur l'attaquant le plus proche
--- (comme l'ancien lock : quand on prend des dégâts, la caméra cible
+-- DÃƒÂ©tection de dÃƒÂ©gÃƒÂ¢ts : auto-lock sur l'attaquant le plus proche
+-- (comme l'ancien lock : quand on prend des dÃƒÂ©gÃƒÂ¢ts, la camÃƒÂ©ra cible
 -- l'attaquant pendant 3 secondes)
 task.spawn(function()
 	local lastHealth = nil
@@ -5274,10 +5336,10 @@ task.spawn(function()
 	end
 end)
 
--- ==================== FOV LOCK (ZOOM CAMÉRA) ====================
--- Zoome la caméra sur la cible verrouillée quand un lock est actif.
--- Le FOV d'origine est mémorisé à l'activation et restauré à la désactivation,
--- pour ne jamais toucher la caméra tant que le FOV Lock est inactif.
+-- ==================== FOV LOCK (ZOOM CAMÃƒâ€°RA) ====================
+-- Zoome la camÃƒÂ©ra sur la cible verrouillÃƒÂ©e quand un lock est actif.
+-- Le FOV d'origine est mÃƒÂ©morisÃƒÂ© ÃƒÂ  l'activation et restaurÃƒÂ© ÃƒÂ  la dÃƒÂ©sactivation,
+-- pour ne jamais toucher la camÃƒÂ©ra tant que le FOV Lock est inactif.
 local fovLockSavedFov = nil
 RunService:BindToRenderStep("XinveFovLock", Enum.RenderPriority.Camera.Value + 3, function()
 	local cam = workspace.CurrentCamera
@@ -5377,7 +5439,7 @@ local function getEspLines(p)
 			line.Parent = espSkelGui
 			espData[p][i] = { line = line, stroke = stroke }
 		end
-		-- Barre de PV verticale à gauche du corps (taillée comme le squelette)
+		-- Barre de PV verticale ÃƒÂ  gauche du corps (taillÃƒÂ©e comme le squelette)
 		local hpBg = Instance.new("Frame")
 		hpBg.Name = "HPBarBg"
 		hpBg.Size = UDim2.new(0, 2, 0, 50)
@@ -5448,7 +5510,7 @@ end
 
 local espHueOffset = 0
 
--- Dessine l'ESP à la toute dernière priorité, après tous les autres scripts
+-- Dessine l'ESP ÃƒÂ  la toute derniÃƒÂ¨re prioritÃƒÂ©, aprÃƒÂ¨s tous les autres scripts
 RunService:BindToRenderStep("XinveEspSkeleton", Enum.RenderPriority.Last.Value + 1, function()
 	local skelOn = S.espSkeletonEnabled
 	-- La barre de PV peut s'afficher seule avec ESP Box (sans squelette)
@@ -5485,8 +5547,8 @@ RunService:BindToRenderStep("XinveEspSkeleton", Enum.RenderPriority.Last.Value +
 						for i = boneCount + 1, 6 do
 							if lines[i] then lines[i].line.Visible = false end
 						end
-						-- Bornes écran du squelette : la barre de PV est alignée
-						-- et taillée exactement comme le squelette
+						-- Bornes ÃƒÂ©cran du squelette : la barre de PV est alignÃƒÂ©e
+						-- et taillÃƒÂ©e exactement comme le squelette
 						local function trackBonePoint(v)
 							if v.Z > 0 then
 								if v.X < skMinX then skMinX = v.X end
@@ -5523,7 +5585,7 @@ RunService:BindToRenderStep("XinveEspSkeleton", Enum.RenderPriority.Last.Value +
 						local barWidth = 2
 						local topY, bottomY, leftX
 						if S.espBoxEnabled then
-							-- ESP Box actif : la barre se place à l'EXTÉRIEUR de la box
+							-- ESP Box actif : la barre se place ÃƒÂ  l'EXTÃƒâ€°RIEUR de la box
 							local bMinX, bMinY, bMaxX, bMaxY = charViewportBounds(cam, char)
 							if bMinX then
 								topY = bMinY
@@ -5531,7 +5593,7 @@ RunService:BindToRenderStep("XinveEspSkeleton", Enum.RenderPriority.Last.Value +
 								leftX = bMinX - barWidth - 3
 							end
 						elseif skMinX ~= math.huge and skMaxY ~= -math.huge then
-							-- Pas de box : alignée sur le squelette comme avant
+							-- Pas de box : alignÃƒÂ©e sur le squelette comme avant
 							topY = skMinY
 							bottomY = skMaxY
 							leftX = skMinX - barWidth - 3
@@ -5560,9 +5622,9 @@ RunService:BindToRenderStep("XinveEspSkeleton", Enum.RenderPriority.Last.Value +
 	end
 end)
 
--- ==================== COMPTEUR DE DÉGÂTS (STYLE FORTNITE) ====================
--- Affiche un nombre flottant à côté du joueur touché, qui monte
--- et disparaît en fondu, comme dans Fortnite.
+-- ==================== COMPTEUR DE DÃƒâ€°GÃƒâ€šTS (STYLE FORTNITE) ====================
+-- Affiche un nombre flottant ÃƒÂ  cÃƒÂ´tÃƒÂ© du joueur touchÃƒÂ©, qui monte
+-- et disparaÃƒÂ®t en fondu, comme dans Fortnite.
 local dmgLastHealth = {}
 local dmgPopups = {}
 local DMG_POPUP_LIFETIME = 1.2
@@ -5595,8 +5657,8 @@ end
 
 RunService.Heartbeat:Connect(function()
 	local now = os.clock()
-	-- On n'attribue les dégâts que si on tire (clic maintenu) ou
-	-- qu'un lock est actif : évite d'afficher les dégâts des autres.
+	-- On n'attribue les dÃƒÂ©gÃƒÂ¢ts que si on tire (clic maintenu) ou
+	-- qu'un lock est actif : ÃƒÂ©vite d'afficher les dÃƒÂ©gÃƒÂ¢ts des autres.
 	local shooting = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
 	for _, p in Players:GetPlayers() do
 		if p ~= player then
@@ -5613,7 +5675,7 @@ RunService.Heartbeat:Connect(function()
 			end
 		end
 	end
-	-- Mise à jour des popups : suivent le joueur, montent et fondent
+	-- Mise ÃƒÂ  jour des popups : suivent le joueur, montent et fondent
 	local cam = workspace.CurrentCamera
 	for i = #dmgPopups, 1, -1 do
 		local pop = dmgPopups[i]
@@ -5641,7 +5703,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- ==================== TRACERS ARC-EN-CIEL ====================
--- Lignes depuis le bas de l'écran vers chaque joueur, en arc-en-ciel
+-- Lignes depuis le bas de l'ÃƒÂ©cran vers chaque joueur, en arc-en-ciel
 local tracerGui = makeLockScreenGui("TracerESP", 2147483646)
 
 local function makeTracerLine()
@@ -5852,7 +5914,7 @@ do
 		local camPos = camCFrame.Position
 		local lookDir = camCFrame.LookVector
 
-		-- Détecter si le joueur bouge activement sa visée (pas d'auto-lock)
+		-- DÃƒÂ©tecter si le joueur bouge activement sa visÃƒÂ©e (pas d'auto-lock)
 		local isActivelyAiming = false
 		if lastLook then
 			local diff = (lookDir - lastLook).Magnitude
@@ -5948,7 +6010,7 @@ UserInputService.JumpRequest:Connect(function()
 	end
 end)
 
--- ==================== TÉLÉPORTATIONS ====================
+-- ==================== TÃƒâ€°LÃƒâ€°PORTATIONS ====================
 local function tpToPlayer(target)
 	if not target then return false end
 	-- Le personnage de la cible peut ne pas etre encore charge
@@ -5972,7 +6034,7 @@ local function tpToPlayer(target)
 	return false
 end
 
--- TP All : cycle de téléportation vers chaque joueur
+-- TP All : cycle de tÃƒÂ©lÃƒÂ©portation vers chaque joueur
 local function startTpAll()
 	if S.tpAllActive then return end
 	S.tpAllActive = true
@@ -5988,7 +6050,7 @@ local function startTpAll()
 			for _, targetP in ipairs(playersList) do
 				if not S.tpAllActive then break end
 				tpToPlayer(targetP)
-				-- Attendre 1 seconde, vérifier l'arrêt toutes les 0.1s
+				-- Attendre 1 seconde, vÃƒÂ©rifier l'arrÃƒÂªt toutes les 0.1s
 				local waited = 0
 				while waited < 1 and S.tpAllActive do
 					task.wait(0.1)
@@ -6000,13 +6062,13 @@ local function startTpAll()
 	end)
 end
 
--- Positions sauvegardées
+-- Positions sauvegardÃƒÂ©es
 local function savePosition()
 	local char = player.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart")
 	if hrp then
 		table.insert(S.savedPositions, hrp.CFrame)
-		notify("Position", "Position sauvegardée (" .. #S.savedPositions .. " saves)")
+		notify("Position", "Position sauvegardÃƒÂ©e (" .. #S.savedPositions .. " saves)")
 	end
 end
 
@@ -6027,7 +6089,7 @@ end
 local function clearSavedPositions()
 	local count = #S.savedPositions
 	table.clear(S.savedPositions)
-	notify("Position", count .. " save(s) supprimée(s)")
+	notify("Position", count .. " save(s) supprimÃƒÂ©e(s)")
 end
 
 -- Rejoint immediatement le serveur actuel (ou le jeu si serveur public)
@@ -6087,7 +6149,7 @@ local function giveAllTools()
 				task.wait()
 			end
 		end
-		notify("GIVE ALL TOOLS", count .. " tools ajoutés")
+		notify("GIVE ALL TOOLS", count .. " tools ajoutÃƒÂ©s")
 	end)
 end
 
@@ -6331,7 +6393,7 @@ local function openBackpackWindow()
 	Title.TextSize = 15
 	Title.TextXAlignment = Enum.TextXAlignment.Left
 	Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-	Title.Text = "Mon Sac — clique un objet pour l'equiper"
+	Title.Text = "Mon Sac Ã¢â‚¬â€ clique un objet pour l'equiper"
 	Title.Parent = Window
 
 	local CloseBtn = Instance.new("TextButton")
@@ -6539,7 +6601,7 @@ local function enableFpsMode()
 		end
 	end)
 
-	-- Désactiver les ombres des parts éloignées (> 500 studs)
+	-- DÃƒÂ©sactiver les ombres des parts ÃƒÂ©loignÃƒÂ©es (> 500 studs)
 	task.spawn(function()
 		local count = 0
 		for _, d in workspace:GetDescendants() do
@@ -6579,7 +6641,7 @@ end
 
 -- ==================== RESPAWN ====================
 player.CharacterAdded:Connect(function(char)
-	-- Le vieux fly est lié au personnage mort
+	-- Le vieux fly est liÃƒÂ© au personnage mort
 	S.flyVelocity = nil
 	S.flyGyro = nil
 	-- La vitesse n'a pas besoin d'etre religee au respawn : le
@@ -7480,7 +7542,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		return
 	end
 	if not buildState.mode or buildState.dragging then return end
-	-- ne pas construire pendant l auto tir (ses clics simulés
+	-- ne pas construire pendant l auto tir (ses clics simulÃƒÂ©s
 	-- au centre de l ecran declencheraient le mode par erreur)
 	if S.autoShootEnabled then return end
 
@@ -7616,7 +7678,7 @@ miscMainModule:create_checkbox({
 -- ---- Onglet Detection : ESP ----
 local espModule = tabs.Detection:create_module({
 	title = "ESP",
-	description = "Voir les joueurs à travers les murs",
+	description = "Voir les joueurs ÃƒÂ  travers les murs",
 	flag = "mod_esp",
 })
 
@@ -7629,7 +7691,7 @@ espModule:create_checkbox({
 	end,
 })
 
--- ---- Fonctionnalités ESP du script lock (intégrées localement) ----
+-- ---- FonctionnalitÃƒÂ©s ESP du script lock (intÃƒÂ©grÃƒÂ©es localement) ----
 espModule:create_checkbox({
 	title = "ESP Squelette/Tracers",
 	flag = "espskel",
@@ -7646,9 +7708,9 @@ espModule:create_checkbox({
 				S.tracerColorMode = "Multicolore"
 			else
 				S.skelCustomColor = color
-				S.skelColorMode = "Personnalisée"
+				S.skelColorMode = "PersonnalisÃƒÂ©e"
 				S.tracerCustomColor = color
-				S.tracerColorMode = "Personnalisée"
+				S.tracerColorMode = "PersonnalisÃƒÂ©e"
 			end
 		end,
 	},
@@ -7669,7 +7731,7 @@ espModule:create_checkbox({
 				S.boxColorMode = "Multicolore"
 			else
 				S.boxCustomColor = color
-				S.boxColorMode = "Personnalisée"
+				S.boxColorMode = "PersonnalisÃƒÂ©e"
 			end
 		end,
 	},
@@ -7690,7 +7752,7 @@ espModule:create_checkbox({
 				S.hpColorMode = "Multicolore"
 			else
 				S.hpCustomColor = color
-				S.hpColorMode = "Personnalisée"
+				S.hpColorMode = "PersonnalisÃƒÂ©e"
 			end
 		end,
 	},
@@ -7724,9 +7786,9 @@ espModule:create_slider({
 	end,
 })
 
--- ---- Onglet Detection : Visée ----
+-- ---- Onglet Detection : VisÃƒÂ©e ----
 local aimModule = tabs.Detection:create_module({
-	title = "Visée",
+	title = "VisÃƒÂ©e",
 	description = "Aim assist et locks",
 	section = "right",
 	flag = "mod_visee",
@@ -7801,7 +7863,7 @@ aimModule:create_checkbox({
 	end,
 })
 
--- ---- Fonctionnalités du script lock (intégrées localement) ----
+-- ---- FonctionnalitÃƒÂ©s du script lock (intÃƒÂ©grÃƒÂ©es localement) ----
 aimModule:create_checkbox({
 	title = "Hold Lock",
 	flag = "holdlock",
@@ -7840,7 +7902,7 @@ aimModule:create_checkbox({
 })
 
 aimModule:create_checkbox({
-	title = "Lock à travers murs",
+	title = "Lock ÃƒÂ  travers murs",
 	flag = "lockwalls",
 	callback = function(state)
 		S.lockThroughWalls = state
@@ -7861,13 +7923,13 @@ aimModule:create_slider({
 -- ---- Onglet Detection : Joueurs ----
 local playersModule = tabs.Detection:create_module({
 	title = "Joueurs",
-	description = "TP, spectate, sélection",
+	description = "TP, spectate, sÃƒÂ©lection",
 	flag = "mod_joueurs",
 })
 
 local function makePlayerDropdownSettings()
 	return {
-		title = "Joueur sélectionné",
+		title = "Joueur sÃƒÂ©lectionnÃƒÂ©",
 		flag = "selected_player",
 		options = playerOptions(),
 		callback = function(option)
@@ -7907,7 +7969,7 @@ playersModule:create_button({
 				notify("TP Joueur", "Cible introuvable")
 			end
 		else
-			notify("TP Joueur", "Aucun joueur sélectionné")
+			notify("TP Joueur", "Aucun joueur sÃƒÂ©lectionnÃƒÂ©")
 		end
 	end,
 })
@@ -7932,7 +7994,7 @@ playersModule:create_button({
 			startSpectate(sel)
 			notify("Spectate", "Spectate : " .. sel.Name)
 		else
-			notify("Spectate", "Aucun joueur sélectionné")
+			notify("Spectate", "Aucun joueur sÃƒÂ©lectionnÃƒÂ©")
 		end
 	end,
 })
@@ -7941,7 +8003,7 @@ playersModule:create_button({
 	title = "Stop Spectate",
 	callback = function()
 		stopSpectate()
-		notify("Spectate", "Spectate arrêté")
+		notify("Spectate", "Spectate arrÃƒÂªtÃƒÂ©")
 	end,
 })
 
@@ -8029,7 +8091,7 @@ autoModule:create_checkbox({
 	end,
 })
 
--- ---- Auto Tir du script lock (intégré localement) ----
+-- ---- Auto Tir du script lock (intÃƒÂ©grÃƒÂ© localement) ----
 autoModule:create_checkbox({
 	title = "Auto Tir",
 	flag = "autotir",
@@ -8202,7 +8264,7 @@ do -- Section isolee : reduit le nombre de variables du scope principal
 					manager:set_percentage(value)
 					applied += 1
 				elseif type(value) == "string" and manager.set_saved then
-					-- Mode de couleur sauvegarde (Multicolore / Personnalisée)
+					-- Mode de couleur sauvegarde (Multicolore / PersonnalisÃƒÂ©e)
 					manager:set_saved(value, data[flag .. "_custom"])
 					applied += 1
 				end
@@ -8289,7 +8351,7 @@ configModule:create_button({
 					manager:set_percentage(value)
 					applied += 1
 				elseif type(value) == "string" and manager.set_saved then
-					-- Mode de couleur sauvegarde (Multicolore / Personnalisée)
+					-- Mode de couleur sauvegarde (Multicolore / PersonnalisÃƒÂ©e)
 					manager:set_saved(value, (loaded._flags or {})[flag .. "_custom"])
 					applied += 1
 				end
@@ -8308,5 +8370,218 @@ configModule:create_text({
 -- checkboxes sont de vrais clics joueur (pas des restaurations de config)
 S.uiReady = true
 
-notify("Features", "Toutes les fonctionnalités sont chargées")
+notify("Features", "Toutes les fonctionnalitÃƒÂ©s sont chargÃƒÂ©es")
 
+
+-- ============================================================
+--  RedTiger - Module clé (temps restant en direct + logs)
+--  (ajoute par le systeme de cles - ne pas retirer)
+-- ============================================================
+do
+	local _rtLibrary = _G.XinveLibrary
+	if type(_rtLibrary) ~= "table" then
+		_rtLibrary = library
+	end
+	local _rtTab = _G.XinveTabs and _G.XinveTabs.Parametres or nil
+	if _rtTab == nil and type(tabs) == "table" then
+		_rtTab = tabs.Parametres
+	end
+
+	if _rtTab ~= nil then
+		local _rtModule = _rtTab:create_module({
+			title = "Cle RedTiger",
+			description = "Ton abonnement, son temps restant et les logs d'utilisation",
+			flag = "mod_redtiger_cle",
+		})
+
+		local _rtTimeText = _rtModule:create_text({
+			text = "Temps restant : chargement...",
+		})
+
+		local _rtLogsText = _rtModule:create_text({
+			text = "Logs : utilise le bouton Actualiser pour voir l'historique",
+		})
+
+		-- ---------- temps restant (rafraichi toutes les 10 s) ----------
+		task.spawn(function()
+			while true do
+				if _G.RedTigerSessionValid == false or type(_G.RedTigerKey) ~= "table" then
+					break
+				end
+				local exp = tonumber(_G.RedTigerKey.expiresUnix) or 0
+				local formatted
+				if exp <= 0 then
+					formatted = "a vie (jamais expire)"
+				else
+					local restant = exp - os.time()
+					if restant <= 0 then
+						-- la boucle watchdog juste en dessous gera la fermeture
+						formatted = "0 (expire)"
+					else
+						local days    = math.floor(restant / 86400)
+						local hours   = math.floor((restant % 86400) / 3600)
+						local minutes = math.floor((restant % 3600) / 60)
+						if days > 1 then
+							formatted = tostring(days) .. " jours " .. tostring(hours) .. " h"
+						elseif days == 1 then
+							formatted = "1 jour " .. tostring(hours) .. " h " .. tostring(minutes) .. " min"
+						elseif hours >= 1 then
+							formatted = tostring(hours) .. " h " .. tostring(minutes) .. " min"
+						else
+							formatted = tostring(minutes) .. " min"
+						end
+					end
+				end
+				pcall(function()
+					_rtTimeText:Set({ text = "Temps restant : " .. formatted .. "\nCle : " .. tostring(_G.RedTigerKey.key or "?") .. "\nExpire le : " .. (exp <= 0 and "jamais" or os.date("%d/%m/%Y %H:%M", exp)) })
+				end)
+				task.wait(10)
+			end
+		end)
+
+		-- ---------- bouton actualiser les logs ----------
+		_rtModule:create_button({
+			title = "Actualiser les logs",
+			callback = function()
+				local lines = {}
+				pcall(function()
+					if readfile ~= nil and isfile ~= nil and isfile("RedTiger/logs.txt") then
+						for line in readfile("RedTiger/logs.txt"):gmatch("[^\r\n]+") do
+							table.insert(lines, line)
+						end
+					end
+				end)
+				local total = #lines
+				if total == 0 then
+					pcall(function() _rtLogsText:Set({ text = "Logs : aucun pour le moment sur ce PC" }) end)
+					return
+				end
+				local start = math.max(1, total - 7)
+				local output = "Logs locaux (" .. tostring(total) .. " entrees) :\n" .. table.concat(lines, "\n", start, total)
+				pcall(function() _rtLogsText:Set({ text = output }) end)
+			end,
+		})
+	end
+end
+
+-- ============================================================
+--  RedTiger - watchdog du panel (autodestruction incontestable)
+--  - si la session est fermee (par le loader OU ici) :
+--      * les logs locaux sont supprimes
+--      * le panel est detruit de l'ecran (Xinve / notifs)
+--      * le fichier cle est supprime
+--      * le joueur est ejecte : rien ne peut contrer cela
+--  - re-check distant periodique independant du loader
+-- ============================================================
+do
+	local function _rtSelfDestruct(reason)
+		_G.RedTigerSessionValid = false
+		pcall(function()
+			if readfile ~= nil and isfile ~= nil and isfile("RedTiger/logs.txt") then
+				delfile("RedTiger/logs.txt")
+			end
+		end)
+		pcall(function()
+			if delfile ~= nil and isfile ~= nil and isfile("RedTiger/key.txt") then
+				delfile("RedTiger/key.txt")
+			end
+		end)
+		pcall(function()
+			local core = game:GetService("CoreGui")
+			local target = core:FindFirstChild("Xinve")
+			if target ~= nil then target:Destroy() end
+		end)
+		pcall(function()
+			local core = game:GetService("CoreGui")
+			for _, child in ipairs(core:GetChildren()) do
+				if child:IsA("ScreenGui") and (child.Name == "RedTigerKeySystem" or child.Name == "Xinve") then
+					child:Destroy()
+				end
+			end
+		end)
+		pcall(function()
+			local players = game:GetService("Players")
+			players.LocalPlayer:Kick("RedTiger | " .. tostring(reason) .. "\nLe panel a ete ferme et supprime.")
+		end)
+		while true do
+			task.wait(1)
+		end
+	end
+
+	-- ---------- horloge locale + etat de session ----------
+	task.spawn(function()
+		while true do
+			if _G.RedTigerSessionValid == false then
+				_rtSelfDestruct("Session de cle fermee.")
+			end
+			if type(_G.RedTigerKey) ~= "table" then
+				_rtSelfDestruct("Cle introuvable en session.")
+			end
+			local exp = tonumber(_G.RedTigerKey.expiresUnix) or 0
+			if exp > 0 and os.time() >= exp then
+				_rtSelfDestruct("Cle expiree (temps ecoule).")
+			end
+			task.wait(10)
+		end
+	end)
+
+	-- ---------- re-check distant independant (4 min) ----------
+	task.spawn(function()
+		while true do
+			task.wait(240)
+			if _G.RedTigerSessionValid == false then
+				break
+			end
+			if type(_G.RedTigerKey) ~= "table" then
+				break
+			end
+			local gotDefinitive = false
+			pcall(function()
+				local http = game:GetService("HttpService")
+				local ok, raw = pcall(function()
+					return game:HttpGet("https://api.github.com/repos/chefnon29/REDTIGER-Lua/contents/keys.json?v=" .. tostring(os.time()))
+				end)
+				if not ok or type(raw) ~= "string" then return end
+				local env = http:JSONDecode(raw)
+				if type(env) ~= "table" or type(env.content) ~= "string" then return end
+				local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+				local payload = env.content:gsub("[^" .. chars .. "=]", "")
+				payload = (payload:gsub(".", function(x)
+					if x == "=" then return "" end
+					local r, f = "", (chars:find(x) - 1)
+					for i = 6, 1, -1 do
+						r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and "1" or "0")
+					end
+					return r
+				end))
+				local decoded = (payload:gsub("%d%d?%d?%d?%d?%d?%d?%d?", function(x)
+					if #x ~= 8 then return "" end
+					local c = 0
+					for i = 1, 8 do
+						c = c + (x:sub(i, i) == "1" and 2 ^ (8 - i) or 0)
+					end
+					return string.char(c)
+				end))
+				local data = http:JSONDecode(decoded)
+				if type(data) == "table" then
+					local entry = data[_G.RedTigerKey.key]
+					if type(entry) ~= "table" then
+						gotDefinitive = true
+						_rtSelfDestruct("Cle supprimee par l'admin (recheck serveur).")
+						return
+					end
+					local exp = tonumber(entry.expires) or 0
+					if exp > 0 and os.time() >= exp then
+						gotDefinitive = true
+						_rtSelfDestruct("Cle expiree (recheck serveur).")
+						return
+					end
+					_G.RedTigerKey.expiresUnix = exp
+				end
+			end)
+			if gotDefinitive then
+				break
+			end
+		end
+	end)
+end
