@@ -83,7 +83,7 @@ async function fetchRemote() {
 
 let remoteSha = null;
 
-async function saveKeys(progressMsg) {
+async function saveKeys() {
     try {
         // sha courant (obligatoire pour modifier un fichier existant)
         const headRes = await fetch(API_REPO, {
@@ -112,7 +112,6 @@ async function saveKeys(progressMsg) {
         return true;
     } catch (e) {
         console.error("GitHub PUT erreur:", e.message);
-        if (progressMsg) await progressMsg.edit(`**Erreur GitHub : la base n'a pas ete mise a jour.** (${e.message.slice(0, 180)})`).catch(() => {});
         return false;
     }
 }
@@ -150,6 +149,22 @@ function isAuthorized(interaction) {
 
 // =================== COMMANDES ===================
 const LOG_WEBHOOK = () => keys["_config"]?.logsWebhook || null;
+
+// Edit protege de l'interaction : jamais de crash "Unknown Message".
+// Si le message d'origine est mort/perdu, on renvoie un nouveau message.
+async function safeEdit(interaction, content) {
+    try {
+        return await interaction.editReply(content);
+    } catch (e) {
+        console.error("editReply:", e.message);
+        try {
+            return await interaction.followUp({ content: "(message perdu, relance la commande)\nErreur : " + e.message, ephemeral: true });
+        } catch {
+            return null;
+        }
+    }
+}
+
 
 async function postLog(title, description, color) {
     const url = LOG_WEBHOOK();
@@ -276,7 +291,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const expires     = dur.seconds === 0 ? 0 : now + dur.seconds;
 
             await interaction.deferReply({ ephemeral: true });
-            const status = await interaction.editReply("Generation en cours...");
 
             const created = [];
             for (let i = 0; i < quantity; i++) {
@@ -284,10 +298,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 keys[key] = { duration: durationKey, created: now, expires, hwid: null };
                 created.push(key);
             }
-            const okS = await saveKeys(status);
+            const okS = await saveKeys();
 
             const lines = created.map((k) => `> \`${k}\``).join("\n");
-            await status.edit(
+            await safeEdit(interaction,
                 `**Cles generees !** (duree : **${dur.label}**) ${okS ? "Synchronise avec GitHub." : "Enregistrement local seul."}\n` +
                 lines +
                 (dur.seconds === 0 ? "\n*Cles a vie, jamais expireront*" : `\n*Expireront le : ${frDate(expires)}*`) +
@@ -299,9 +313,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         if (cmd === "listkeys") {
             await interaction.deferReply({ ephemeral: true });
-            const entries = Object.entries(keys).filter(([k]) => !k.startsWith("_"))
+            const entries = Object.entries(keys).filter(([k]) => !k.startsWith("_"));
             if (entries.length === 0) {
-                await interaction.editReply("Aucune cle dans la base. Utilise `/genkey`");
+                await safeEdit(interaction, "Aucune cle dans la base. Utilise `/genkey`");
                 return;
             }
             const now = Math.floor(Date.now() / 1000);
@@ -312,8 +326,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
             });
             for (let i = 0; i < lines.length; i += 25) {
                 const chunk = lines.slice(i, i + 25).join("\n");
-                if (i === 0) await interaction.editReply(`**${entries.length} cle(s) :**\n${chunk}`);
-                else await interaction.followUp({ content: chunk, ephemeral: true });
+                if (i === 0) await safeEdit(interaction, `**${entries.length} cle(s) :**\n${chunk}`);
+                else await interaction.followUp({ content: chunk, ephemeral: true }).catch(() => {});
             }
             return;
         }
@@ -321,14 +335,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
         if (cmd === "delkey") {
             await interaction.deferReply({ ephemeral: true });
             const key = interaction.options.getString("cle", true).toUpperCase().trim().replace(/\s/g, "");
-            const status = await interaction.editReply("Suppression...");
             if (!keys[key]) {
-                await status.edit(`Cle \`${key}\` introuvable.`);
+                await safeEdit(interaction, `Cle \`${key}\` introuvable.`);
                 return;
             }
             delete keys[key];
-            const okS = await saveKeys(status);
-            await status.edit(`Cle \`${key}\` supprimee. ${okS ? "Synchronise avec GitHub." : "Sauvegarde locale seulement."}\nBase : **${Object.keys(keys).filter((k) => !k.startsWith("_")).length}** cle(s)`);
+            const okS = await saveKeys();
+            await safeEdit(interaction, `Cle \`${key}\` supprimee. ${okS ? "Synchronise avec GitHub." : "Sauvegarde locale seulement."}\nBase : **${Object.keys(keys).filter((k) => !k.startsWith("_")).length}** cle(s)`);
             await postLog("🗑️ Cle supprimee", `\`${key}\` supprimee par ${interaction.user}\nSi quelqu'un l'a encore en session, il sera ejecte a la prochaine verification.`, 15158332);
             return;
         }
@@ -338,18 +351,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
             const key = interaction.options.getString("cle", true).toUpperCase().trim().replace(/\s/g, "");
             const entry = keys[key];
             if (!entry) {
-                await interaction.editReply(`\`${key}\` : cle **invalide** (n'existe pas dans la base).`);
+                await safeEdit(interaction, `\`${key}\` : cle **invalide** (n'existe pas dans la base).`);
                 return;
             }
             const now = Math.floor(Date.now() / 1000);
             const expired = entry.expires > 0 && now >= entry.expires;
-            await interaction.editReply(
+            await safeEdit(interaction,
                 `**${key}**\n` +
                 `- Duree : **${DURATIONS[entry.duration]?.label ?? entry.duration}**\n` +
                 `- Cree le : ${frDate(entry.created)}\n` +
                 `- Expire le : ${frDate(entry.expires)}\n` +
                 `- Statut : **${expired ? "expire" : "valide"}**\n` +
-                `- HWID : ${entry.hwid ? "delie" : "delie"}`
+                `- HWID : ${entry.hwid ? "lie a un PC" : "delie (libre)"}`
             );
             return;
         }
@@ -358,34 +371,32 @@ client.on(Events.InteractionCreate, async (interaction) => {
             await interaction.deferReply({ ephemeral: true });
             const key = interaction.options.getString("cle", true).toUpperCase().trim().replace(/\s/g, "");
             const dur = DURATIONS[interaction.options.getString("duree", true)];
-            const status = await interaction.editReply("Rallongement...");
             if (!keys[key]) {
-                await status.edit(`Cle \`${key}\` introuvable.`);
+                await safeEdit(interaction, `Cle \`${key}\` introuvable.`);
                 return;
             }
             const durInfo = DURATIONS[keys[key].duration] ?? { seconds: 0, label: "?" };
             if (durInfo.seconds === 0) {
-                await status.edit(`Cle \`${key}\` est deja **a vie**, rien a rallonger !`);
+                await safeEdit(interaction, `Cle \`${key}\` est deja **a vie**, rien a rallonger !`);
                 return;
             }
             keys[key].expires = Math.max(keys[key].expires ?? 0, Math.floor(Date.now() / 1000)) + dur.seconds;
             keys[key].duration = interaction.options.getString("duree", true);
-            const okS = await saveKeys(status);
-            await status.edit(`Cle \`${key}\` : nouvelle duree **${dur.label}** (expire ${frDate(keys[key].expires)}) ${okS ? "Synchronise avec GitHub." : ""}`);
+            const okS = await saveKeys();
+            await safeEdit(interaction, `Cle \`${key}\` : nouvelle duree **${dur.label}** (expire ${frDate(keys[key].expires)}) ${okS ? "Synchronise avec GitHub." : ""}`);
             return;
         }
 
         if (cmd === "reset-hwid") {
             await interaction.deferReply({ ephemeral: true });
             const key = interaction.options.getString("cle", true).toUpperCase().trim().replace(/\s/g, "");
-            const status = await interaction.editReply("Delie...");
             if (!keys[key]) {
-                await status.edit(`Cle \`${key}\` introuvable.`);
+                await safeEdit(interaction, `Cle \`${key}\` introuvable.`);
                 return;
             }
             keys[key].hwid = null;
-            const okS = await saveKeys(status);
-            await status.edit(`Cle \`${key}\` : HWID delie. Ok ${okS ? "synchronise" : "local seul"}.`);
+            const okS = await saveKeys();
+            await safeEdit(interaction, `Cle \`${key}\` : HWID delie. Ok ${okS ? "synchronise" : "local seul"}.`);
             return;
         }
 
@@ -398,18 +409,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
             try {
                 webhook = await channel.createWebhook({ name: "RedTiger Logs" });
             } catch (e) {
-                await interaction.editReply(`Impossible de creer le webhook dans <#${channel.id}> : ${e.message}`);
+                await safeEdit(interaction, `Impossible de creer le webhook dans <#${channel.id}> : ${e.message}`);
                 return;
             }
 
             keys["_config"] = { logsWebhook: webhook.url };
             const okS = await saveKeys();
-            await interaction.editReply(
+            await safeEdit(interaction,
                 `Canal de logs configure : **<#${channel.id}>**\n` +
-                `Chaque utilisation de cle (qui, quelle cle, quel jeu) sera postée ici par le panel.\n` +
-                `${okS ? "Synchronise avec GitHub (les panels utilisent ca tout de suite)." : "Erreur de synchro GitHub, reesse en relancant la commande."}`
+                `Chaque utilisation de cle (qui, quelle cle, quel jeu) sera postee ici par le panel.\n` +
+                `${okS ? "Synchronise avec GitHub (les panels utilisent ca tout de suite)." : "Erreur de synchro GitHub, retente en relancant la commande."}`
             );
-            const cfg = keys["_config"];
             try {
                 await webhook.send({ embeds: [{ title: "Logs RedTiger initialisés", description: "Ce canal recevra toutes les utilisations de cles du panel", color: 3066993 }] });
             } catch { /* non bloquant */ }
@@ -417,15 +427,47 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
     } catch (e) {
         console.error("interaction err:", e);
-        if (interaction.deferred || !interaction.replied) {
-            await interaction.editReply("Erreur : " + e.message).catch(() => {});
-        }
+        const msg = "Erreur : " + (e && e.message ? e.message : String(e));
+        try {
+            if (!interaction.deferred && !interaction.replied) {
+                await interaction.reply({ content: msg, ephemeral: true }).catch(() => {});
+            } else {
+                await interaction.editReply(msg).catch(() => {});
+            }
+        } catch { /* le message est peut-etre mort : on ne peut que log la console */ }
     }
 });
 
 // =================== START ===================
 client.on("error", (e) => console.error("[Client erreur]", e.message));
 process.on("unhandledRejection", (e) => console.error("[Rejection non géré]", e));
+
+// ----- verrou anti-double-instance -----
+// (deux bots qui tournent en meme temps = edits "Unknown Message" + gros bugs)
+const LOCK_FILE = path.join(__dirname, "bot.lock");
+try {
+    let otherAlive = false;
+    if (fs.existsSync(LOCK_FILE)) {
+        const oldPid = parseInt(fs.readFileSync(LOCK_FILE, "utf8").trim(), 10);
+        if (oldPid && oldPid !== process.pid) {
+            try { process.kill(oldPid, 0); otherAlive = true; } catch { /* mort */ }
+        }
+    }
+    if (otherAlive) {
+        console.error("===============================================");
+        console.error("UN AUTRE REDTIGER KEYBOT TOURNE DEJA (PID " + oldPid + ")");
+        console.error("Ferme cette fenetre, et ferme l'autre aussi");
+        console.error("(ferme toutes les fenetres du bot puis relance)");
+        console.error("===============================================");
+        process.exit(1);
+    }
+    fs.writeFileSync(LOCK_FILE, String(process.pid));
+    process.on("exit", () => {
+        try {
+            if (fs.readFileSync(LOCK_FILE, "utf8").trim() === String(process.pid)) fs.unlinkSync(LOCK_FILE);
+        } catch { /* rien */ }
+    });
+} catch { /* si le verrou ne peut pas etre ecrit, on continue quand meme */ }
 
 loadLocal();
 client.login(DISCORD_TOKEN);
