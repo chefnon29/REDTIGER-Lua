@@ -1,45 +1,9 @@
 {
-  "62F7405017E12E9F": {
-    "duration": "1h",
-    "created": 1793896647,
-    "expires": 1793900247,
-    "hwid": null,
-    "mask": "REDTIGER-****-****-P5XB",
-    "pkey": "sM780NxRuUGR2RnX7biSow=="
-  },
-  "494E1C0C11D04CBF": {
-    "duration": "1h",
-    "created": 1793896972,
-    "expires": 1793900572,
-    "hwid": null,
-    "mask": "REDTIGER-****-****-LLAM",
-    "pkey": "SvaVCsKyq6c5w6r0KwD1Bw=="
-  },
-  "F3A5C9B80F1D3CD2": {
-    "duration": "1h",
-    "created": 1793898543,
-    "expires": 1793902143,
-    "hwid": null,
-    "mask": "REDTIGER-****-****-NM7D",
-    "pkey": "sgnfbuQI1rjzZJKXSBK9Qg=="
-  },
-  "_retired": [],
-  "8B16BEFC098B4E69": {
-    "mask": "REDTIGER-****-****-K25V",
-    "vkey": "AqisqCyeHh7LR7ESUHQz7gvhHczn4vY=",
-    "duration": "1h",
-    "created": 1793899018,
-    "expires": 1793902618,
-    "hwid": null,
-    "pkey": "BCtvgZ7T+VHe5ymIxobKow=="
-  },
-  "3B5AFE63417A40FD": {
-    "mask": "REDTIGER-****-****-SN6R",
-    "vkey": "AqisqCyeHh7LQdxsW3RXnQuFHdSb4fI=",
-    "duration": "1h",
-    "created": 1793908330,
-    "expires": 1793911930,
-    "hwid": null,
-    "pkey": "R3cqTkYyOH3Sb5RwqeMChA=="
-  }
+  "_retired": [
+    "62F7405017E12E9F",
+    "494E1C0C11D04CBF",
+    "F3A5C9B80F1D3CD2",
+    "8B16BEFC098B4E69",
+    "3B5AFE63417A40FD"
+  ]
 }
