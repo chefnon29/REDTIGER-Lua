@@ -5,5 +5,14 @@
     "F3A5C9B80F1D3CD2",
     "8B16BEFC098B4E69",
     "3B5AFE63417A40FD"
-  ]
+  ],
+  "D26B73491222B88A": {
+    "mask": "REDTIGER-****-****-DCWP",
+    "vkey": "AqisqCyeHh7LTt0EWXRMnQL0HcOWgPA=",
+    "duration": "1h",
+    "created": 1793984751,
+    "expires": 1793988351,
+    "hwid": null,
+    "pkey": "+X0ykWFebXmDTJpcrKGajQ=="
+  }
 }
