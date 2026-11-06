@@ -1,12 +1,12 @@
 --/$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
---  RedTiger - Key System (loader v1.4)
+--  RedTiger - Key System (loader v1.5)
 --  - Fenêtre de clé : rien ne se lance sans clé valide
 --  - Session surveillée : clé expirée/supprimée = panel fermé,
 --    fichiers supprimés, joueur éjecté, logs postés
 --  - _G.RedTigerKey / _G.RedTigerSessionValid consommés par Panel.lua
 --/$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
-print("[RedTiger] Version loader : v1.4");
+print("[RedTiger] Version loader : v1.5");
 print("[RedTiger] Loader demarre - verification de la clé...")
 print("[RedTiger] Executor : " .. (function()
 	local ok, name = pcall(function() return getExecutorName and getExecutorName() or "inconnu" end)
@@ -582,6 +582,14 @@ local function checkKey(key)
 		return false, expires, "expire", "Clé expiree. Demande-en une nouvelle ou un extension a ton admin."
 	end
 
+	-- Binding PC : la premiere personne qui utilise la cle la garde.
+	-- Toute autre personne (autre PC/executor) est refusee tant que
+	-- l'admin n'a pas fait /reset-hwid.
+	local lhwid = tostring(type(entry) == "table" and entry.hwid or "")
+	if #lhwid > 0 and lhwid ~= HWID then
+		return false, expires, "pris", "Cle deja utilisee sur un autre PC. Une seule personne par cle : demande une nouvelle cle a ton admin."
+	end
+
 	return true, expires, "ok", "", entry
 end
 
@@ -645,6 +653,10 @@ local function validate()
 	if not ok then
 		guiStatus("❌ " .. tostring(message))
 		verifyButton.Text = "Valider"
+		-- cle definitivement inutilisable : on oublie la sauvegarde locale
+		if tag == "invalide" or tag == "expire" or tag == "pris" then
+			deleteSavedKey()
+		end
 		return
 	end
 
@@ -718,3 +730,16 @@ keyBox.FocusLost:Connect(function(enterPressed)
 end)
 
 guiStatus("Pret. Entre ta clé puis clique Valider (ou appuie sur Entree).")
+
+-- ================================================================
+--  Reconnexion automatique : la cle validee une fois n'est plus
+--  demande. Au lancement suivant le panel se lance tout seul.
+-- ================================================================
+do
+	local saved = loadSavedKey()
+	if type(saved) == "string" and #saved > 0 then
+		print("[RedTiger] Cle sauvegardee trouvee : autologin...")
+		keyBox.Text = saved
+		validate()
+	end
+end
