@@ -1,12 +1,12 @@
 --/$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
---  RedTiger - Key System (loader v1.3)
+--  RedTiger - Key System (loader v1.4)
 --  - Fenêtre de clé : rien ne se lance sans clé valide
 --  - Session surveillée : clé expirée/supprimée = panel fermé,
 --    fichiers supprimés, joueur éjecté, logs postés
 --  - _G.RedTigerKey / _G.RedTigerSessionValid consommés par Panel.lua
 --/$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 
-print("[RedTiger] Version loader : v1.3");
+print("[RedTiger] Version loader : v1.4");
 print("[RedTiger] Loader demarre - verification de la clé...")
 print("[RedTiger] Executor : " .. (function()
 	local ok, name = pcall(function() return getExecutorName and getExecutorName() or "inconnu" end)
@@ -582,7 +582,7 @@ local function checkKey(key)
 		return false, expires, "expire", "Clé expiree. Demande-en une nouvelle ou un extension a ton admin."
 	end
 
-	return true, expires, nil, entry
+	return true, expires, "ok", "", entry
 end
 
 -- ================================================================
