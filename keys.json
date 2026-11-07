@@ -9,7 +9,9 @@
     "38CE733DC2B3BED5",
     "66525928A2CAC919",
     "9D2DBF6D069E3F1C",
-    "C01ED5CBF950088A"
+    "C01ED5CBF950088A",
+    "E2923D475C21850C",
+    "91A7704E0548E394"
   ],
   "507121B76F8D273A": {
     "mask": "REDTIGER-****-****-7Q5Z",
@@ -37,24 +39,6 @@
     "expires": 1794161292,
     "hwid": null,
     "pkey": "9M1VmrnjQMW06+8lcda/zA=="
-  },
-  "E2923D475C21850C": {
-    "mask": "REDTIGER-****-****-UBX8",
-    "vkey": "AqisqCyeHh7LOKgVT3RR4RbmHdKXj5g=",
-    "duration": "1h",
-    "created": 1794075026,
-    "expires": 1794078626,
-    "hwid": "EE27682AB88E23F4",
-    "pkey": "9ekwpw6Tr1RPjM49WYUUMA=="
-  },
-  "91A7704E0548E394": {
-    "mask": "REDTIGER-****-****-FXH4",
-    "vkey": "AqisqCyeHh7LOaJrU3Q15hv9HcGNn5Q=",
-    "duration": "1h",
-    "created": 1794075058,
-    "expires": 1794078658,
-    "hwid": "E0BB2C45CFBE670A",
-    "pkey": "r9uhHNtI3yy+9oqJ9VY51Q=="
   },
   "9BFCB49100FE569F": {
     "mask": "REDTIGER-****-****-8D2P",
