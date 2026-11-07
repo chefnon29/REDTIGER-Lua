@@ -11,18 +11,18 @@ end)())
 local Players     = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
-local REPO_RAW  = "https://raw.githubusercontent.com/chefnon29/REDTIGER-Lua/refs/heads/main"
-local KEYS_API  = "https://api.github.com/repos/chefnon29/REDTIGER-Lua/contents/keys.json"
-local KEYS_RAW  = REPO_RAW .. "/keys.json"
-local PANEL_ENC_URL = REPO_RAW .. "/Panel.enc.lua"
+local _w1  = "https://raw.githubuser" .. "content.com/chefnon" .. "29/REDTIGER-Lua" .. "/refs/heads/main"
+local _w2  = "https://api.github.co" .. "m/repos/chefnon29/R" .. "EDTIGER-Lua/con" .. "tents/keys.json"
+local KEYS_RAW  = _w1 .. "/keys.json"
+local _w3 = _w1 .. "/Panel.enc.lua"
 local KEY_FILE  = "RedTiger/key.txt"
-local LOGS_FILE = "RedTiger/logs.txt"
-local globalWait = wait
-local function _wait(seconds)
+local _w4 = "RedTi" .. "ger/" .. "logs" .. ".txt"
+local _w6 = wait
+local function _x1(seconds)
 if task ~= nil and task.wait ~= nil then return task.wait(seconds) end
-return globalWait(seconds)
+return _w6(seconds)
 end
-local function httpGet(url)
+local function _x2(url)
 local lastError = ""
 for i = 1, 3 do
 local cacheBust = "?v=" .. tostring(os.time()) .. tostring(math.random(10000, 99999))
@@ -33,16 +33,16 @@ if ok and type(res) == "string" then
 return res
 end
 lastError = tostring(res or "erreur inconnue")
-_wait(0.4)
+_x1(0.4)
 end
 return nil, lastError
 end
-local function normalizeKey(input)
+local function _x5(input)
 local key = tostring(input or ""):upper()
 key = key:gsub("%s", "")
 return key
 end
-local function saveKey(key)
+local function _x9(key)
 pcall(function()
 if writefile then
 if isfolder ~= nil and makefolder ~= nil and not isfolder("RedTiger") then
@@ -52,24 +52,24 @@ writefile(KEY_FILE, key)
 end
 end)
 end
-local function deleteSavedKey()
+local function _x7()
 pcall(function()
 if delfile ~= nil and isfile ~= nil and isfile(KEY_FILE) then
 delfile(KEY_FILE)
 end
 end)
 end
-local function appendLog(line)
+local function _x6(line)
 pcall(function()
 if appendfile then
 if isfolder ~= nil and makefolder ~= nil and not isfolder("RedTiger") then
 makefolder("RedTiger")
 end
-appendfile(LOGS_FILE, line .. "\n")
+appendfile(_w4, line .. "\n")
 end
 end)
 end
-local function loadSavedKey()
+local function _z5()
 local key
 pcall(function()
 if readfile ~= nil and isfile ~= nil and isfile(KEY_FILE) then
@@ -77,18 +77,18 @@ key = readfile(KEY_FILE)
 end
 end)
 if type(key) == "string" and #key > 0 then
-return normalizeKey(key)
+return _x5(key)
 end
 return nil
 end
-local function dateFr(timestamp)
+local function _x3(timestamp)
 local ok, result = pcall(function()
 return os.date("%d/%m/%Y a %H:%M", timestamp)
 end)
 if ok and result ~= nil then return tostring(result) end
 return "date inconnue"
 end
-local HWID = "unknown"
+local _w5 = "unknown"
 do
 local id
 pcall(function()
@@ -109,9 +109,9 @@ else
 id = "unk-" .. tostring(math.random(100000, 999999))
 end
 end
-HWID = id
+_w5 = id
 end
-local function humanExpires(expiresNow)
+local function _x4(expiresNow)
 expiresNow = tonumber(expiresNow) or 0
 if expiresNow <= 0 then return "a vie" end
 local restant = expiresNow - os.time()
@@ -125,7 +125,7 @@ if hours > 1 then return tostring(hours) .. " h " .. tostring(minutes) .. " min"
 return tostring(minutes) .. " min"
 end
 local B64CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-local function b64decode(data)
+local function _y9(data)
 data = data:gsub("[^" .. B64CHARS .. "=]", "")
 data = (data:gsub(".", function(x)
 if x == "=" then return "" end
@@ -144,8 +144,8 @@ end
 return string.char(c)
 end))
 end
-local RT_KEY_SALT = "65DF14AEB7D7660D078D639EAF40E144"
-local function rtImul32(a, b)
+local _w0 = "65DF14AEB" .. "7D7660D07" .. "8D639EA" .. "F40E144"
+local function _z1(a, b)
 local al = a % 65536
 local ah = (a - al) / 65536
 local bl = b % 65536
@@ -154,41 +154,41 @@ local lo = al * bl
 local mid = (al * bh + ah * bl) % 65536
 return (lo + mid * 65536) % 4294967296
 end
-local function rtBytes(s)
+local function _z0(s)
 local t = {}
 for i = 1, #s do t[i] = string.byte(s, i) end
 return t
 end
-local function rtHash32(msg, saltStr)
+local function _z3(msg, saltStr)
 local h = 0x811C9DC5
 local function mix(b)
 h = bit32.bxor(h, b)
-h = rtImul32(h, 0x01000193)
+h = _z1(h, 0x01000193)
 h = bit32.bxor(h, bit32.lrotate(h, 7))
 end
-for _, b in ipairs(rtBytes(saltStr)) do mix(b) end
-for _, b in ipairs(rtBytes(msg)) do mix(b) end
+for _, b in ipairs(_z0(saltStr)) do mix(b) end
+for _, b in ipairs(_z0(msg)) do mix(b) end
 h = bit32.bxor(h, bit32.rshift(h, 16))
-h = rtImul32(h, 0x85EBCA6B)
+h = _z1(h, 0x85EBCA6B)
 h = bit32.bxor(h, bit32.rshift(h, 13))
-h = rtImul32(h, 0xC2B2AE35)
+h = _z1(h, 0xC2B2AE35)
 h = bit32.bxor(h, bit32.rshift(h, 16))
 return h
 end
-local function rtHex8(h)
+local function _z2(h)
 return string.upper(string.format("%08x", h))
 end
-local function rtHash64(msg, salt)
-return rtHex8(rtHash32(msg, salt)) .. rtHex8(rtHash32(msg, salt .. "#2"))
+local function _z4(msg, salt)
+return _z2(_z3(msg, salt)) .. _z2(_z3(msg, salt .. "#2"))
 end
-local function rtKeyHash(key)
-return rtHash64(key, RT_KEY_SALT .. "/key/")
+local function _z6(key)
+return _z4(key, _w0 .. "/key/")
 end
-local function rtMakeCipher(secret)
-local x = rtHash32(secret, "rt/cipher/1")
-local y = rtHash32(secret, "rt/cipher/2")
-local z = rtHash32(secret, "rt/cipher/3")
-local d = rtHash32(secret, "rt/cipher/4")
+local function _z7(secret)
+local x = _z3(secret, "rt/cipher/1")
+local y = _z3(secret, "rt/cipher/2")
+local z = _z3(secret, "rt/cipher/3")
+local d = _z3(secret, "rt/cipher/4")
 return function()
 local t = bit32.bxor(x, bit32.lshift(x, 11))
 x = y
@@ -204,7 +204,7 @@ for i = 1, #B64CHARS do
 B64VAL_RT[string.byte(B64CHARS, i)] = i - 1
 end
 end
-local function b64ToBytes(b64)
+local function _y8(b64)
 local out = {}
 local n = 0
 local buf = 0
@@ -225,10 +225,10 @@ end
 end
 return out
 end
-local function rtDecryptPKey(pkeyB64, userKey)
-local raw = b64decode(tostring(pkeyB64 or ""))
+local function _z8(pkeyB64, userKey)
+local raw = _y9(tostring(pkeyB64 or ""))
 if type(raw) ~= "string" or #raw == 0 then return nil end
-local nextByte = rtMakeCipher(userKey)
+local nextByte = _z7(userKey)
 local out = {}
 for i = 1, #raw do
 out[i] = string.char(bit32.band(bit32.bxor(string.byte(raw, i), nextByte()), 255))
@@ -237,9 +237,9 @@ local k = table.concat(out)
 if #k == 16 then return k end
 return nil
 end
-local function rtDecryptBlob(b64, secret)
-local bytes = b64ToBytes(tostring(b64 or ""))
-local nextByte = rtMakeCipher(secret)
+local function _z9(b64, secret)
+local bytes = _y8(tostring(b64 or ""))
+local nextByte = _z7(secret)
 local chunks = {}
 local n = #bytes
 local start = 1
@@ -256,13 +256,13 @@ start = limit + 1
 end
 return table.concat(chunks)
 end
-local function fetchKeysTable()
+local function _y7()
 local ok, envelope = pcall(function()
-local raw = httpGet(KEYS_API)
+local raw = _x2(_w2)
 return HttpService:JSONDecode(raw)
 end)
 if ok and type(envelope) == "table" and type(envelope.content) == "string" then
-local decoded = b64decode(envelope.content)
+local decoded = _y9(envelope.content)
 if decoded and #decoded > 0 then
 local jsonOk, data = pcall(function() return HttpService:JSONDecode(decoded) end)
 if jsonOk and type(data) == "table" then
@@ -270,7 +270,7 @@ return data
 end
 end
 end
-local res, resError = httpGet(KEYS_RAW)
+local res, resError = _x2(KEYS_RAW)
 if res == nil then
 return false, resError
 end
@@ -281,7 +281,7 @@ end
 return false, "JSON invalide"
 end
 local statusLabel, keyBox, verifyButton
-local function guiStatus(text)
+local function _y1(text)
 pcall(function()
 if statusLabel ~= nil then statusLabel.Text = tostring(text) end
 end)
@@ -352,7 +352,7 @@ local clientIdLabel = Instance.new("TextLabel")
 clientIdLabel.Size = UDim2.new(1, -20, 0, 16)
 clientIdLabel.Position = UDim2.new(0, 10, 0, 60)
 clientIdLabel.BackgroundTransparency = 1
-clientIdLabel.Text = "Ton ID unique : " .. HWID
+clientIdLabel.Text = "Ton ID unique : " .. _w5
 clientIdLabel.TextColor3 = Color3.fromRGB(130, 130, 140)
 clientIdLabel.Font = Enum.Font.Gotham
 clientIdLabel.TextSize = 11
@@ -365,7 +365,7 @@ keyBox.BackgroundColor3 = Color3.fromRGB(30, 30, 36)
 keyBox.TextColor3 = Color3.fromRGB(240, 240, 245)
 keyBox.PlaceholderText  = "XXXX-XXXX-XXXX-XXXX"
 keyBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
-keyBox.Text       = loadSavedKey() or ""
+keyBox.Text       = _z5() or ""
 keyBox.Font       = Enum.Font.Gotham
 keyBox.TextSize   = 14
 keyBox.ClearTextOnFocus = false
@@ -428,7 +428,7 @@ end)
 return
 end
 _G.RedTigerSessionValid = false
-local function displayGui()
+local function _y2()
 pcall(function()
 if gui ~= nil and gui.Parent ~= nil then
 gui:Destroy()
@@ -452,28 +452,28 @@ end
 end
 end)
 end
-local function killSession(reason)
+local function _y3(reason)
 _G.RedTigerSessionValid = false
-deleteSavedKey()
+_x7()
 pcall(function()
-if isfile ~= nil and delfile ~= nil and isfile(LOGS_FILE) then
-delfile(LOGS_FILE)
+if isfile ~= nil and delfile ~= nil and isfile(_w4) then
+delfile(_w4)
 end
 end)
-displayGui()
+_y2()
 pcall(function()
 LocalPlayer:Kick("RedTiger | " .. reason .. "\nLe panel a été fermé et supprimé. Demande a ton admin si besoin.")
 end)
 while true do
-_wait(1)
+_x1(1)
 end
 end
-local function checkKey(key)
-local data, dataErr = fetchKeysTable()
+local function _y6(key)
+local data, dataErr = _y7()
 if type(data) ~= "table" then
 return false, 0, "serveur", "Serveur injoignable, retente dans quelques secondes. (" .. tostring(dataErr) .. ")"
 end
-local entry = data[rtKeyHash(key)]
+local entry = data[_z6(key)]
 if type(entry) ~= "table" then
 return false, 0, "invalide", "Clé invalide. Demande une clé a ton admin Discord."
 end
@@ -482,42 +482,42 @@ if expires > 0 and os.time() >= expires then
 return false, expires, "expire", "Clé expiree. Demande-en une nouvelle ou un extension a ton admin."
 end
 local lhwid = tostring(type(entry) == "table" and entry.hwid or "")
-if #lhwid > 0 and lhwid ~= HWID then
+if #lhwid > 0 and lhwid ~= _z4(_w5, _w0 .. "/hwid/") then
 return false, expires, "pris", "Cle deja utilisee sur un autre PC. Une seule personne par cle : demande une nouvelle cle a ton admin."
 end
 return true, expires, "ok", "", entry
 end
-local function loadPanelCode(userKey, entry)
+local function _y5(userKey, entry)
 local pkeyB64 = tostring(type(entry) == "table" and entry.pkey or "")
 if #pkeyB64 == 0 then
 return nil, "Cette cle n'a pas d'acces au panel. Demande une nouvelle cle a ton admin."
 end
-local secret = rtDecryptPKey(pkeyB64, userKey)
+local secret = _z8(pkeyB64, userKey)
 if secret == nil then
 return nil, "Acces au panel incorrect pour cette cle."
 end
-local blob, blobErr = httpGet(PANEL_ENC_URL)
+local blob, blobErr = _x2(_w3)
 if blob == nil then
 return nil, "Telechargement du panel impossible (" .. tostring(blobErr) .. ")"
 end
-local code = rtDecryptBlob(blob, secret)
+local code = _z9(blob, secret)
 if type(code) ~= "string" or #code < 64 then
 return nil, "Panel verrouille pour cette cle."
 end
 return code
 end
-local function launchPanel(userKey, entry)
+local function _y4(userKey, entry)
 rtLog("[RedTiger] Etape 3 : dechiffrement + chargement du panel...")
-local code, err = loadPanelCode(userKey, entry)
+local code, err = _y5(userKey, entry)
 if code == nil then
-guiStatus("❌ " .. tostring(err))
+_y1("❌ " .. tostring(err))
 rtLog("[RedTiger] Chargement du panel impossible : " .. tostring(err))
 return
 end
 local fn, compileErr = loadstring(code)
 if fn == nil then
 rtLog("[RedTiger] Erreur de compilation du panel : " .. tostring(compileErr))
-guiStatus("❌ Erreur interne du panel.")
+_y1("❌ Erreur interne du panel.")
 return
 end
 local ok, runErr = pcall(fn)
@@ -525,64 +525,64 @@ if not ok then
 rtLog("[RedTiger] Erreur d'execution du panel : " .. tostring(runErr))
 end
 end
-local function validate()
-local key = normalizeKey(keyBox.Text)
+local function _x0()
+local key = _x5(keyBox.Text)
 if #key == 0 then
-guiStatus("⚠ Entre ta clé avant de valider.")
+_y1("⚠ Entre ta clé avant de valider.")
 return
 end
-guiStatus("Verification de la clé...")
+_y1("Verification de la clé...")
 verifyButton.Text = "Verification..."
-local ok, expiresUnix, tag, message, entry = checkKey(key)
+local ok, expiresUnix, tag, message, entry = _y6(key)
 if not ok then
-guiStatus("❌ " .. tostring(message))
+_y1("❌ " .. tostring(message))
 verifyButton.Text = "Valider"
 if tag == "invalide" or tag == "expire" or tag == "pris" then
-deleteSavedKey()
+_x7()
 end
 return
 end
 _G.RedTigerKey = {
 key = key,
 expiresUnix = tonumber(expiresUnix) or 0,
-hwid = HWID,
+hwid = _w5,
 user = tostring(LocalPlayer and LocalPlayer.UserId or "?"),
 game = tostring(game.Name or "?") .. "(" .. tostring(game.GameId or "?") .. ")",
 }
 _G.RedTigerSessionValid = true
-saveKey(key)
-local restantText = humanExpires(expiresUnix)
-guiStatus("✅ Clé valide ! Bienvenue sur RedTiger. (" .. restantText .. ")")
+_x9(key)
+local restantText = _x4(expiresUnix)
+_y1("✅ Clé valide ! Bienvenue sur RedTiger. (" .. restantText .. ")")
 verifyButton.Text = "Connecte"
 local playerName = tostring(LocalPlayer ~= nil and LocalPlayer.Name or "?")
 local gameName   = tostring(game.Name or "?") .. " (" .. tostring(game.GameId or "?") .. ")"
-appendLog("[" .. dateFr(os.time()) .. "] Connexion | clé=" .. key .. " | " .. playerName .. " | " .. gameName .. " | reste " .. restantText)
-_wait(0.8)
-displayGui()
+_x6("[" .. _x3(os.time()) .. "] Connexion | clé=" .. key .. " | " .. playerName .. " | " .. gameName .. " | reste " .. restantText)
+_x1(0.8)
+_y2()
 task.spawn(function()
 while true do
-_wait(10)
+_x1(10)
 if type(_G.RedTigerSessionValid) ~= "boolean" or not _G.RedTigerSessionValid then
 break -- deja tuée (par le panel par exemple)
 end
 local exp = tonumber(_G.RedTigerKey ~= nil and _G.RedTigerKey.expiresUnix or 0) or 0
 if exp > 0 and os.time() >= exp then
-killSession("Clé expirée (temps restant : 0).")
+_y3("Clé expirée (temps restant : 0).")
 break
 end
 end
 end)
 task.spawn(function()
 while true do
-_wait(180)
+_x1(180)
 if type(_G.RedTigerSessionValid) ~= "boolean" or not _G.RedTigerSessionValid then
 break
 end
-local currentKey = normalizeKey((_G.RedTigerKey or {}).key)
-local okr, expiresNow, tagR, messageR = checkKey(currentKey)
+local currentKey = _x5((_G.RedTigerKey or {}).key)
+local okr, expiresNow, tagR, messageR = _y6(currentKey)
 if not okr then
 if tagR == "invalide" or tagR == "expire" then
-killSession("Clé " .. (tagR == "invalide" and "supprimée" or "expirée") .. " (recheck serveur)")
+_y3("Clé " .. (tagR == "invalide" and "supprimée" or "expirée") .. " (recheck serveur)")
 break
 end
 else
@@ -590,26 +590,26 @@ _G.RedTigerKey.expiresUnix = expiresNow or 0
 end
 end
 end)
-launchPanel(key, entry)
+_y4(key, entry)
 return true
 end
-verifyButton.MouseButton1Click:Connect(validate)
+verifyButton.MouseButton1Click:Connect(_x0)
 keyBox.FocusLost:Connect(function(enterPressed)
-if enterPressed then validate() end
+if enterPressed then _x0() end
 end)
-guiStatus("Pret. Entre ta clé puis clique Valider (ou appuie sur Entree).")
+_y1("Pret. Entre ta clé puis clique Valider (ou appuie sur Entree).")
 do
-local saved = loadSavedKey()
+local saved = _z5()
 if type(saved) == "string" and #saved > 0 then
 rtLog("[RedTiger] Cle sauvegardee trouvee : autologin...")
 keyBox.Text = saved
 pcall(function()
 gui.Enabled = false
 end)
-local okAuto = validate()
+local okAuto = _x0()
 if okAuto ~= true then
 pcall(function()
-guiStatus("Entre ta nouvelle clé.")
+_y1("Entre ta nouvelle clé.")
 end)
 pcall(function()
 keyBox.Text = ""
