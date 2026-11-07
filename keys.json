@@ -6,17 +6,9 @@
     "8B16BEFC098B4E69",
     "3B5AFE63417A40FD",
     "D26B73491222B88A",
-    "38CE733DC2B3BED5"
+    "38CE733DC2B3BED5",
+    "66525928A2CAC919"
   ],
-  "66525928A2CAC919": {
-    "mask": "REDTIGER-****-****-JUFK",
-    "vkey": "AqisqCyeHh7LQbwUVXQynRyFHc2Akes=",
-    "duration": "1h",
-    "created": 1794048454,
-    "expires": 1794052054,
-    "hwid": null,
-    "pkey": "VZT3B6e5lBR0jgLsw2jG7Q=="
-  },
   "507121B76F8D273A": {
     "mask": "REDTIGER-****-****-7Q5Z",
     "vkey": "AqisqCyeHh7LSqkZXXRM8WX0HbCE4vo=",
