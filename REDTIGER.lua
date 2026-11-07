@@ -1,6 +1,10 @@
-print("[RedTiger] Version loader : v1.5");
-print("[RedTiger] Loader demarre - verification de la clé...")
-print("[RedTiger] Executor : " .. (function()
+local RT_DEBUG = false
+local function rtLog(...)
+if RT_DEBUG then print(...) end
+end
+rtLog("[RedTiger] Version loader : v1.5");
+rtLog("[RedTiger] Loader demarre - verification de la clé...")
+rtLog("[RedTiger] Executor : " .. (function()
 local ok, name = pcall(function() return getExecutorName and getExecutorName() or "inconnu" end)
 return ok and tostring(name) or "inconnu"
 end)())
@@ -397,9 +401,9 @@ statusLabel.TextWrapped = true
 statusLabel.Parent = frame
 return screenGui
 end)
-print("[RedTiger] Etape 2 : fenetre de clé creee")
+rtLog("[RedTiger] Etape 2 : fenetre de clé creee")
 if not success or gui == nil then
-print("[RedTiger] ERREUR popup normale : " .. tostring(gui) .. " -> popup de secours")
+rtLog("[RedTiger] ERREUR popup normale : " .. tostring(gui) .. " -> popup de secours")
 pcall(function()
 local sg = Instance.new("ScreenGui")
 sg.Name = "RedTigerKeySystem"
@@ -503,22 +507,22 @@ end
 return code
 end
 local function launchPanel(userKey, entry)
-print("[RedTiger] Etape 3 : dechiffrement + chargement du panel...")
+rtLog("[RedTiger] Etape 3 : dechiffrement + chargement du panel...")
 local code, err = loadPanelCode(userKey, entry)
 if code == nil then
 guiStatus("❌ " .. tostring(err))
-print("[RedTiger] Chargement du panel impossible : " .. tostring(err))
+rtLog("[RedTiger] Chargement du panel impossible : " .. tostring(err))
 return
 end
 local fn, compileErr = loadstring(code)
 if fn == nil then
-warn("[RedTiger] Erreur de compilation du panel : " .. tostring(compileErr))
+rtLog("[RedTiger] Erreur de compilation du panel : " .. tostring(compileErr))
 guiStatus("❌ Erreur interne du panel.")
 return
 end
 local ok, runErr = pcall(fn)
 if not ok then
-warn("[RedTiger] Erreur d'execution du panel : " .. tostring(runErr))
+rtLog("[RedTiger] Erreur d'execution du panel : " .. tostring(runErr))
 end
 end
 local function validate()
@@ -596,7 +600,7 @@ guiStatus("Pret. Entre ta clé puis clique Valider (ou appuie sur Entree).")
 do
 local saved = loadSavedKey()
 if type(saved) == "string" and #saved > 0 then
-print("[RedTiger] Cle sauvegardee trouvee : autologin...")
+rtLog("[RedTiger] Cle sauvegardee trouvee : autologin...")
 keyBox.Text = saved
 validate()
 end
