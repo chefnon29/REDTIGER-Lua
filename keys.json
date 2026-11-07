@@ -26,5 +26,14 @@
     "expires": 0,
     "hwid": "405227733F4B61BD",
     "pkey": "hyCYNv5tuXgKtPOz6sFUbg=="
+  },
+  "9D2DBF6D069E3F1C": {
+    "mask": "REDTIGER-****-****-ZURT",
+    "vkey": "AqisqCyeHh7LW9AGTnRT6RmDHd2AhfQ=",
+    "duration": "lifetime",
+    "created": 1794074683,
+    "expires": 0,
+    "hwid": null,
+    "pkey": "23czq3a1byOKtxl+77iAbg=="
   }
 }
