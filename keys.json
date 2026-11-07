@@ -37,5 +37,14 @@
     "expires": 1794161292,
     "hwid": null,
     "pkey": "9M1VmrnjQMW06+8lcda/zA=="
+  },
+  "E2923D475C21850C": {
+    "mask": "REDTIGER-****-****-UBX8",
+    "vkey": "AqisqCyeHh7LOKgVT3RR4RbmHdKXj5g=",
+    "duration": "1h",
+    "created": 1794075026,
+    "expires": 1794078626,
+    "hwid": null,
+    "pkey": "9ekwpw6Tr1RPjM49WYUUMA=="
   }
 }
