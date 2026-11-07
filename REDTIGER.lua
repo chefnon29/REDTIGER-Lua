@@ -591,6 +591,7 @@ end
 end
 end)
 launchPanel(key, entry)
+return true
 end
 verifyButton.MouseButton1Click:Connect(validate)
 keyBox.FocusLost:Connect(function(enterPressed)
@@ -602,6 +603,20 @@ local saved = loadSavedKey()
 if type(saved) == "string" and #saved > 0 then
 rtLog("[RedTiger] Cle sauvegardee trouvee : autologin...")
 keyBox.Text = saved
-validate()
+pcall(function()
+gui.Enabled = false
+end)
+local okAuto = validate()
+if okAuto ~= true then
+pcall(function()
+guiStatus("Entre ta nouvelle clé.")
+end)
+pcall(function()
+keyBox.Text = ""
+end)
+pcall(function()
+gui.Enabled = true
+end)
+end
 end
 end
