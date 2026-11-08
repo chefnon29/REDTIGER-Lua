@@ -19,7 +19,7 @@
     "duration": "lifetime",
     "created": 1794050255,
     "expires": 0,
-    "hwid": "EE27682AB88E23F4",
+    "hwid": null,
     "pkey": "hQ8vO3BkncC3eUYyEXaO3g=="
   },
   "1A47CEEED8041316": {
@@ -28,7 +28,7 @@
     "duration": "lifetime",
     "created": 1794060678,
     "expires": 0,
-    "hwid": "405227733F4B61BD",
+    "hwid": null,
     "pkey": "hyCYNv5tuXgKtPOz6sFUbg=="
   },
   "532F9DAB9F0D13A4": {
