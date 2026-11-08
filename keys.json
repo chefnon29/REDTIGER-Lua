@@ -14,7 +14,8 @@
     "91A7704E0548E394",
     "90CDC1A65D1DABC5",
     "2341E628474DFA49",
-    "532F9DAB9F0D13A4"
+    "532F9DAB9F0D13A4",
+    "3E195AB0DE119661"
   ],
   "507121B76F8D273A": {
     "mask": "REDTIGER-****-****-7Q5Z",
@@ -51,14 +52,5 @@
     "expires": 0,
     "hwid": null,
     "pkey": "6Nyq3McOuSEVjAZOrDxyJg=="
-  },
-  "3E195AB0DE119661": {
-    "mask": "REDTIGER-****-****-ARP8",
-    "vkey": "AqisqCyeHh7LRaYKX3RKkwj1HcaHh5g=",
-    "duration": "1h",
-    "created": 1794164950,
-    "expires": 1794168550,
-    "hwid": null,
-    "pkey": "dfgaPef7K1a1RhRT4iUxCQ=="
   }
 }
