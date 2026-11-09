@@ -52,5 +52,14 @@
     "expires": 0,
     "hwid": null,
     "pkey": "6Nyq3McOuSEVjAZOrDxyJg=="
+  },
+  "9884C8E0CFBAFDFE": {
+    "mask": "REDTIGER-****-****-JN6E",
+    "vkey": "AqisqCyeHh7LP7YUVXRU8QT/Hc2b4eU=",
+    "duration": "1h",
+    "created": 1794187118,
+    "expires": 1794190718,
+    "hwid": null,
+    "pkey": "tcUCybCiTCQQbdo2UtxIsQ=="
   }
 }
